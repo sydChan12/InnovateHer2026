@@ -28,5 +28,11 @@
             list.innerHTML = players.map(p => `<li>${p.name}</li>`).join('');
         });
     </script>
+    <div id="gameUI" style="display:none">
+        <h2 id="roleSecret">Hold to Reveal Role</h2>
+        <button onmousedown="reveal()" onmouseup="hide()">REVEAL ROLE</button>
+        <hr>
+        <button id="startBtn" onclick="startGame()">START GAME (Host Only)</button>
+    </div>
 </body>
 </html>

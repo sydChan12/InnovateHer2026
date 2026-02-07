@@ -3,28 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Secret Crimson</title>
+    <title>Under the Bell Tower</title>
     <style>
         :root { --purdue-gold: #CEB888; --purdue-black: #000000; --iu-crimson: #990000; }
         body { font-family: 'Segoe UI', sans-serif; background: #1a1a1a; color: white; margin: 0; display: flex; height: 100vh; }
         #sidebar { width: 220px; background: #000; border-right: 2px solid var(--purdue-gold); padding: 20px; }
         #main-game { flex-grow: 1; padding: 20px; display: flex; flex-direction: column; align-items: center; overflow-y: auto; }
-        .container { background: #333; width: 100%; max-width: 600px; padding: 20px; border-radius: 15px; border: 1px solid #555; text-align: center; }
-        .track { display: flex; gap: 5px; justify-content: center; background: #222; padding: 10px; border-radius: 5px; margin-bottom: 20px; }
-        .slot { width: 70px; height: 90px; border: 2px dashed #555; border-radius: 4px; font-size: 0.6rem; display: flex; align-items: center; justify-content: center; flex-direction: column; font-weight: bold; }
+        .container { background: #333; width: 100%; max-width: 650px; padding: 20px; border-radius: 15px; border: 1px solid #555; text-align: center; }
+        .track { display: flex; gap: 8px; justify-content: center; background: #222; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+        .slot { width: 85px; height: 110px; border: 2px dashed #555; border-radius: 4px; font-size: 0.65rem; display: flex; align-items: center; justify-content: center; flex-direction: column; text-align: center; font-weight: bold; }
         .filled-tradition { background: var(--purdue-gold); color: black; border-style: solid; }
         .filled-construction { background: var(--iu-crimson); color: white; border-style: solid; }
-        button { padding: 10px; margin: 5px; cursor: pointer; border-radius: 5px; border: none; font-weight: bold; }
+        button { padding: 12px; margin: 5px; cursor: pointer; border-radius: 6px; border: none; font-weight: bold; }
         .gold-btn { background: var(--purdue-gold); color: black; }
-        .policy-card { background: white; color: black; padding: 15px; margin: 5px; border-radius: 5px; cursor: pointer; display: inline-block; width: 90px; }
-        #voteUI { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); display:none; flex-direction:column; justify-content:center; align-items:center; z-index:100; }
-        #status { background: var(--purdue-gold); color: black; padding: 8px; border-radius: 5px; margin-bottom: 10px; font-weight: bold; display: none; }
+        .policy-card { background: #eee; color: black; padding: 20px; margin: 10px; border-radius: 8px; cursor: pointer; display: inline-block; width: 100px; box-shadow: 0 4px #ccc; }
+        #voteUI { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); display:none; flex-direction:column; justify-content:center; align-items:center; z-index:100; }
+        #status { background: var(--purdue-gold); color: black; padding: 10px; border-radius: 5px; margin-bottom: 10px; font-weight: bold; display: none; }
     </style>
 </head>
 <body>
 
     <div id="sidebar">
-        <h3 style="border-bottom: 2px solid var(--purdue-gold);">Students</h3>
+        <h3 style="border-bottom: 2px solid var(--purdue-gold);">Campus Directory</h3>
         <div id="playerList"></div>
     </div>
 
@@ -32,39 +32,43 @@
         <div id="status"></div>
 
         <div id="setup" class="container">
-            <h1>🚂 Secret Crimson</h1>
-            <input id="username" placeholder="Name" style="padding:10px;">
-            <button class="gold-btn" onclick="join()">Join Lobby</button>
+            <h1>🔔 Under the Bell Tower</h1>
+            <p>Boilermakers vs. Hoosiers</p>
+            <input id="username" placeholder="Purdue ID Name" style="padding:10px; width:60%;">
+            <button class="gold-btn" onclick="join()">Enter Lobby</button>
         </div>
 
         <div id="gameUI" class="container" style="display:none">
+            <h3>Tradition Track (Boilermaker Victory at 5)</h3>
             <div class="track" id="traditionTrack"></div>
+            
+            <h3>Construction Track (Hoosier Victory at 6)</h3>
             <div class="track" id="constructionTrack"></div>
             
-            <p id="roleSecret" style="color:var(--purdue-gold)">Role is Hidden</p>
-            <button class="gold-btn" onmousedown="reveal()" onmouseup="hide()" ontouchstart="reveal()" ontouchend="hide()">REVEAL ROLE</button>
+            <p id="roleSecret" style="color:var(--purdue-gold); font-size: 1.2rem;">Role is Hidden</p>
+            <button class="gold-btn" onmousedown="reveal()" onmouseup="hide()" ontouchstart="reveal()" ontouchend="hide()">HOLD TO REVEAL SECRET IDENTITY</button>
 
-            <div id="presidentialActions" style="margin-top:20px; border-top:1px solid #555; padding-top:15px;">
-                <input id="nominee" placeholder="Nominate Chancellor">
-                <button class="gold-btn" onclick="nominate()">Nominate</button>
-                <button onclick="drawCards()" style="background:#555; color:white;">Draw 3 Policies</button>
+            <div id="presActions" style="margin-top:25px; border-top:1px solid #555; padding-top:20px;">
+                <input id="nominee" placeholder="Nominate VP" style="padding:10px;">
+                <button class="gold-btn" onclick="nominate()">Nominate VP</button>
+                <button id="drawBtn" onclick="drawCards()" style="background:#444; color:white; display:none;">Draw 3 Policies</button>
             </div>
 
-            <div id="legislativeArea" style="display:none; margin-top:20px; background:#444; padding:15px; border-radius:10px;">
+            <div id="legisArea" style="display:none; margin-top:20px; background:#444; border: 2px solid var(--purdue-gold); padding:20px; border-radius:10px;">
                 <h4 id="legisTitle">Legislative Session</h4>
                 <div id="policyButtons"></div>
             </div>
         </div>
 
         <div id="lobbyControls" style="display:none; margin-top:20px;">
-            <button class="gold-btn" onclick="startGame()">START GAME</button>
+            <button class="gold-btn" style="padding: 20px;" onclick="startGame()">START SEMESTER</button>
         </div>
     </div>
 
     <div id="voteUI">
         <h2 id="voteTitle"></h2>
-        <button class="gold-btn" onclick="castVote('Ja!')">Ja! (Yes)</button>
-        <button style="background:var(--iu-crimson); color:white;" onclick="castVote('Nein!')">Nein! (No)</button>
+        <button class="gold-btn" onclick="castVote('Boiler Up!')" style="font-size:1.2rem;">🚂 Boiler Up! (Yes)</button>
+        <button style="background:var(--iu-crimson); color:white; font-size:1.2rem;" onclick="castVote('Hammer Down!')">🔨 Hammer Down! (No)</button>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
@@ -95,25 +99,26 @@
         function startGame() { socket.emit('startGame'); }
 
         socket.on('updatePlayerList', (players) => {
-            document.getElementById('playerList').innerHTML = players.map(p => `<div style="padding:5px;">🚂 ${p.name}</div>`).join('');
+            document.getElementById('playerList').innerHTML = players.map(p => `<div style="padding:8px; border-bottom:1px solid #222;">🚂 ${p.name}</div>`).join('');
         });
 
         socket.on('assignRole', (role) => {
             myRole = role;
             document.getElementById('lobbyControls').style.display = 'none';
             document.getElementById('gameUI').style.display = 'block';
-            showStatus("Roles Assigned!");
+            showStatus("Secret Identities Assigned.");
         });
 
         function reveal() { document.getElementById('roleSecret').innerText = myRole; }
         function hide() { document.getElementById('roleSecret').innerText = "Role is Hidden"; }
 
         function nominate() {
-            socket.emit('nominateChancellor', document.getElementById('nominee').value);
+            const nominee = document.getElementById('nominee').value;
+            if(nominee) socket.emit('nominateVP', nominee); // Fixed event name
         }
 
         socket.on('showVote', (data) => {
-            document.getElementById('voteTitle').innerText = `Elect ${data.president} & ${data.chancellor}?`;
+            document.getElementById('voteTitle').innerText = `Elect President ${data.president} & VP ${data.vp}?`;
             document.getElementById('voteUI').style.display = 'flex';
         });
 
@@ -122,13 +127,15 @@
             document.getElementById('voteUI').style.display = 'none';
         }
 
-        socket.on('voteResult', (d) => { showStatus(`${d.name} voted ${d.choice}`); });
+        socket.on('voteResult', (d) => { showStatus(`${d.name} voted: ${d.choice}`); });
 
-        function drawCards() { socket.emit('drawPolicies'); }
+        function drawCards() { 
+            socket.emit('drawPolicies'); 
+            document.getElementById('drawBtn').style.display = 'none';
+        }
 
-        // PRESIDENT'S TURN (Draw 3, Discard 1)
         socket.on('presidentHand', (hand) => {
-            document.getElementById('legislativeArea').style.display = 'block';
+            document.getElementById('legisArea').style.display = 'block';
             document.getElementById('legisTitle').innerText = "President: Discard ONE card";
             const btnArea = document.getElementById('policyButtons');
             btnArea.innerHTML = '';
@@ -140,16 +147,15 @@
                     let remaining = [...hand];
                     remaining.splice(index, 1);
                     socket.emit('presidentDiscard', remaining);
-                    document.getElementById('legislativeArea').style.display = 'none';
+                    document.getElementById('legisArea').style.display = 'none';
                 };
                 btnArea.appendChild(card);
             });
         });
 
-        // CHANCELLOR'S TURN (Draw 2, Enact 1)
-        socket.on('chancellorHand', (hand) => {
-            document.getElementById('legislativeArea').style.display = 'block';
-            document.getElementById('legisTitle').innerText = "Chancellor: Enact ONE card";
+        socket.on('vpHand', (hand) => {
+            document.getElementById('legisArea').style.display = 'block';
+            document.getElementById('legisTitle').innerText = "VP: Enact ONE card";
             const btnArea = document.getElementById('policyButtons');
             btnArea.innerHTML = hand.map(p => 
                 `<div class="policy-card" onclick="enact('${p}')">${p}</div>`).join('');
@@ -157,7 +163,7 @@
 
         function enact(p) {
             socket.emit('enactPolicy', p);
-            document.getElementById('legislativeArea').style.display = 'none';
+            document.getElementById('legisArea').style.display = 'none';
         }
 
         socket.on('policyUpdated', (data) => {
@@ -168,15 +174,17 @@
             for(let i=0; i<5; i++) {
                 let p = data.tradition[i];
                 tTrack.innerHTML += `<div class="slot ${p?'filled-tradition':''}">
-                    ${p ? `<span>${p.type}</span><br><small>P:${p.pres}</small><br><small>C:${p.chan}</small>` : 'Empty'}
+                    ${p ? `<span>${p.type}</span><br><small>P: ${p.pres}</small><br><small>VP: ${p.vp}</small>` : 'Empty'}
                 </div>`;
             }
             for(let i=0; i<6; i++) {
                 let p = data.construction[i];
                 cTrack.innerHTML += `<div class="slot ${p?'filled-construction':''}">
-                    ${p ? `<span>${p.type}</span><br><small>P:${p.pres}</small><br><small>C:${p.chan}</small>` : 'Empty'}
+                    ${p ? `<span>${p.type}</span><br><small>P: ${p.pres}</small><br><small>VP: ${p.vp}</small>` : 'Empty'}
                 </div>`;
             }
+            // If the vote passed, the President may draw cards
+            document.getElementById('drawBtn').style.display = 'inline-block';
         });
 
         socket.on('statusMsg', (m) => showStatus(m));

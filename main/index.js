@@ -6,7 +6,7 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// Game State Variables
+// Game State
 let players = [];
 let deck = [];
 let discardPile = [];
@@ -17,56 +17,61 @@ let lastVP = null;
 let currentPres = null;
 let currentVP = null;
 let currentVotes = {};
+let gameActive = false;
 
-/**
- * Official Setup: 11 Construction (Fascist), 6 Tradition (Liberal) [cite: 38]
- */
+// Per official rules: 6 Liberal (Tradition), 11 Fascist (Construction) [cite: 38, 51]
 function createDeck() {
     deck = [...Array(6).fill("Tradition"), ...Array(11).fill("Construction")];
     deck.sort(() => 0.5 - Math.random());
+    discardPile = [];
 }
 
 app.get('/', (req, res) => { res.sendFile(__dirname + '/index.html'); });
 
 io.on('connection', (socket) => {
+    // 1. Lobby: Join Game
     socket.on('joinGame', (name) => {
-        if (players.length < 10) {
-            players.push({ id: socket.id, name, role: 'Unassigned', party: 'Liberal' });
-            io.emit('updatePlayerList', players.map(p => p.name));
-        }
+        if (gameActive) return socket.emit('errorMsg', "Game already in progress.");
+        if (players.length >= 10) return socket.emit('errorMsg', "Lobby is full (Max 10).");
+        
+        players.push({ id: socket.id, name, role: 'Unassigned', party: 'Liberal' });
+        io.emit('updatePlayerList', players.map(p => p.name));
     });
 
+    // 2. Lobby: Start Game
     socket.on('startGame', () => {
-        if (players.length < 5) return socket.emit('errorMsg', "Need 5 players! [cite: 56]");
+        if (players.length < 5) return socket.emit('errorMsg', "Official rules require 5-10 players[cite: 56].");
         
+        gameActive = true;
         createDeck();
         enactedPolicies = { tradition: 0, construction: 0 };
         electionTracker = 0;
 
-        // Role Distribution for 5 Players: 3 Boilermakers, 1 Hoosier Spy, 1 Bison [cite: 56]
+        // Role Distribution [cite: 56]
         let shuffled = [...players].sort(() => 0.5 - Math.random());
+        // For 5 players: 3 Liberals, 1 Fascist, 1 Hitler [cite: 56]
         players.forEach(p => {
-            if (p.id === shuffled[0].id) { p.role = "THE BISON 🦬"; p.party = "Hoosier"; }
-            else if (p.id === shuffled[1].id) { p.role = "HOOSIER SPY 🚩"; p.party = "Hoosier"; }
-            else { p.role = "BOILERMAKER 🚂"; p.party = "Boilermaker"; }
+            if (p.id === shuffled[0].id) { p.role = "THE BISON 🦬"; p.party = "Fascist"; }
+            else if (p.id === shuffled[1].id) { p.role = "HOOSIER SPY 🚩"; p.party = "Fascist"; }
+            else { p.role = "BOILERMAKER 🚂"; p.party = "Liberal"; }
+            
             io.to(p.id).emit('assignRole', { role: p.role, party: p.party });
         });
-        io.emit('statusMsg', "The semester has begun. President, nominate your VP.");
+
+        io.emit('gameStarted');
+        io.emit('statusMsg', "Roles assigned. President, nominate your VP.");
     });
 
-    /**
-     * Phase 1: Nomination [cite: 88]
-     */
+    // 3. Phase: Nomination [cite: 88]
     socket.on('nominateVP', (vpName) => {
         const nominee = players.find(p => p.name === vpName);
         const pres = players.find(p => p.id === socket.id);
 
         if (!nominee || nominee.id === socket.id) return socket.emit('errorMsg', "Invalid nominee.");
         
-        // Term Limit Check: Last elected Pres/VP are ineligible [cite: 92, 99]
-        if (nominee.name === lastVP || (players.length > 5 && nominee.name === lastPresident)) {
-            return socket.emit('errorMsg', `${vpName} is term-limited! `);
-        }
+        // Term Limit Check 
+        const isTermLimited = (nominee.name === lastVP) || (players.length > 5 && nominee.name === lastPresident);
+        if (isTermLimited) return socket.emit('errorMsg', `${vpName} is term-limited!`);
 
         currentPres = pres;
         currentVP = nominee;
@@ -74,9 +79,7 @@ io.on('connection', (socket) => {
         io.emit('startVoting', { pres: pres.name, vp: nominee.name });
     });
 
-    /**
-     * Phase 2: Voting [cite: 103, 108]
-     */
+    // 4. Phase: Voting [cite: 106]
     socket.on('submitVote', (vote) => {
         currentVotes[socket.id] = vote;
         if (Object.keys(currentVotes).length === players.length) {
@@ -85,38 +88,41 @@ io.on('connection', (socket) => {
 
             if (yes > no) {
                 electionTracker = 0;
-                // Win Condition: Bison elected VP after 3 Construction policies [cite: 24, 120]
+                // Win condition: Hitler (Bison) elected Chancellor (VP) after 3 Fascist policies 
                 if (enactedPolicies.construction >= 3 && currentVP.role === "THE BISON 🦬") {
-                    return io.emit('gameOver', "HOOSIERS WIN: The Bison was elected VP! [cite: 24]");
+                    return io.emit('gameOver', "HOOSIERS WIN: The Bison was elected VP!");
                 }
-                io.emit('statusMsg', `Election Passed (${yes}-${no}). President, draw policies.`);
+                io.emit('statusMsg', `Election Passed (${yes}-${no}). President, draw 3.`);
                 io.to(currentPres.id).emit('presDrawPhase');
             } else {
-                electionTracker++;
-                io.emit('statusMsg', `Election Failed (${yes}-${no}). Tracker: ${electionTracker}/3 [cite: 110]`);
+                electionTracker++; // [cite: 110]
+                io.emit('statusMsg', `Election Failed (${yes}-${no}). Tracker: ${electionTracker}/3`);
                 
-                // Chaos Rule: 3 failed elections enacts top policy [cite: 111]
+                // Chaos Rule [cite: 111, 112]
                 if (electionTracker >= 3) {
                     const chaosPolicy = deck.shift();
                     chaosPolicy === "Tradition" ? enactedPolicies.tradition++ : enactedPolicies.construction++;
                     electionTracker = 0;
                     io.emit('policyUpdated', { enactedPolicies, electionTracker });
-                    io.emit('statusMsg', `CHAOS! Top policy enacted: ${chaosPolicy} [cite: 112]`);
+                    io.emit('statusMsg', `CHAOS! Top policy enacted: ${chaosPolicy}`);
                 }
             }
         }
     });
 
-    /**
-     * Phase 3: Legislative Session [cite: 123]
-     */
+    // 5. Phase: Legislative Session [cite: 123]
     socket.on('drawThree', () => {
-        if (deck.length < 3) { deck = [...deck, ...discardPile].sort(() => 0.5 - Math.random()); discardPile = []; }
-        const hand = deck.splice(0, 3);
+        if (socket.id !== currentPres.id) return;
+        if (deck.length < 3) {
+            deck = [...deck, ...discardPile].sort(() => 0.5 - Math.random());
+            discardPile = [];
+        }
+        const hand = deck.splice(0, 3); // President draws 3 [cite: 125]
         socket.emit('presDiscardPhase', hand);
     });
 
     socket.on('presDiscard', (remainingTwo) => {
+        // President passes 2 to Chancellor (VP) [cite: 126]
         io.to(currentVP.id).emit('vpEnactPhase', remainingTwo);
     });
 
@@ -127,10 +133,16 @@ io.on('connection', (socket) => {
 
         io.emit('policyUpdated', { enactedPolicies, electionTracker: 0 });
         
-        // Final Victory Checks [cite: 23, 24]
-        if (enactedPolicies.tradition >= 5) io.emit('gameOver', "BOILERMAKERS WIN! 🚂 [cite: 23]");
-        if (enactedPolicies.construction >= 6) io.emit('gameOver', "HOOSIERS WIN! 🚩 [cite: 24]");
+        // Final Win Conditions [cite: 30, 33]
+        if (enactedPolicies.tradition >= 5) io.emit('gameOver', "BOILERMAKERS WIN!");
+        if (enactedPolicies.construction >= 6) io.emit('gameOver', "HOOSIERS WIN!");
+    });
+
+    socket.on('disconnect', () => {
+        players = players.filter(p => p.id !== socket.id);
+        io.emit('updatePlayerList', players.map(p => p.name));
+        if (players.length < 1) gameActive = false;
     });
 });
 
-server.listen(3000, () => console.log('Purdue Server: http://localhost:3000'));
+server.listen(3000, () => console.log('Server running at http://localhost:3000'));

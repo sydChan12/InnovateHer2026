@@ -36,9 +36,6 @@ io.on('connection', (socket) => {
         const room = rooms[code];
         if (!room) return socket.emit('errorMsg', "Room not found.");
         if (room.gameActive) return socket.emit('errorMsg', "Game already in progress.");
-        if (room.players.some(p => p.name.toLowerCase() === userName.toLowerCase())) {
-            return socket.emit('errorMsg', "Name already taken in this room.");
-        }
         joinPlayerToRoom(socket, code, userName, false);
     });
 
@@ -48,10 +45,8 @@ io.on('connection', (socket) => {
         room.players.push(newPlayer);
         socket.join(roomCode);
         socket.roomCode = roomCode;
-
         socket.emit('joinedRoom', { roomCode, isHost, name });
         io.to(roomCode).emit('updatePlayerList', getPlayerListWithStatus(room));
-        io.to(roomCode).emit('chatMessage', { user: "SYSTEM", msg: `${name} joined room ${roomCode}` });
     }
 
     socket.on('startGame', () => {
@@ -59,7 +54,9 @@ io.on('connection', (socket) => {
         if (!room || room.players.length < 5) return socket.emit('errorMsg', "Need 5+ players.");
         
         room.gameActive = true;
+        // 11 IU (Construction), 6 Purdue (Tradition)
         room.deck = [...Array(6).fill("Tradition"), ...Array(11).fill("Construction")].sort(() => 0.5 - Math.random());
+        room.discardPile = [];
         
         let shuffled = [...room.players].sort(() => 0.5 - Math.random());
         let bison = shuffled[0];
@@ -110,9 +107,8 @@ io.on('connection', (socket) => {
 
     socket.on('nominateVP', (vpName) => {
         const room = rooms[socket.roomCode];
-        const nominee = room.players.find(p => p.name === vpName);
-        room.currentVP = nominee;
-        io.to(socket.roomCode).emit('startVoting', { pres: room.currentPres.name, vp: nominee.name });
+        room.currentVP = room.players.find(p => p.name === vpName);
+        io.to(socket.roomCode).emit('startVoting', { pres: room.currentPres.name, vp: room.currentVP.name });
     });
 
     socket.on('submitVote', (vote) => {
@@ -130,33 +126,45 @@ io.on('connection', (socket) => {
             } else {
                 room.electionTracker++;
                 if (room.electionTracker >= 3) {
-                    applyPolicy(socket.roomCode, room.deck.shift());
                     room.electionTracker = 0;
+                    shuffleIfNecessary(room, 1);
+                    applyPolicy(socket.roomCode, room.deck.shift());
                 } else startNewRound(room);
             }
         }
     });
 
-    socket.on('drawThree', () => {
-        const room = rooms[socket.roomCode];
-        if (room.deck.length < 3) {
+    function shuffleIfNecessary(room, needed) {
+        if (room.deck.length < needed) {
             room.deck = [...room.deck, ...room.discardPile].sort(() => 0.5 - Math.random());
             room.discardPile = [];
+            io.to(socket.roomCode).emit('chatMessage', { user: "SYSTEM", msg: "Deck empty. Reshuffling discards..." });
         }
+    }
+
+    socket.on('drawThree', () => {
+        const room = rooms[socket.roomCode];
+        shuffleIfNecessary(room, 3);
         socket.emit('presDiscardPhase', room.deck.splice(0, 3));
     });
 
-    socket.on('presDiscard', (rem) => {
+    socket.on('presDiscard', (data) => {
         const room = rooms[socket.roomCode];
-        io.to(room.currentVP.id).emit('vpEnactPhase', { cards: rem, canVeto: room.enactedPolicies.construction >= 5 });
+        room.discardPile.push(data.discarded);
+        io.to(room.currentVP.id).emit('vpEnactPhase', { cards: data.kept, canVeto: room.enactedPolicies.construction >= 5 });
     });
 
-    socket.on('vpEnact', (chosen) => applyPolicy(socket.roomCode, chosen));
+    socket.on('vpEnact', (data) => {
+        const room = rooms[socket.roomCode];
+        room.discardPile.push(data.discarded);
+        applyPolicy(socket.roomCode, data.enacted);
+    });
 
     function applyPolicy(roomCode, type) {
         const room = rooms[roomCode];
         type === "Tradition" ? room.enactedPolicies.tradition++ : room.enactedPolicies.construction++;
-        room.lastPresident = room.currentPres.name; room.lastVP = room.currentVP.name;
+        room.lastPresident = room.currentPres.name; 
+        room.lastVP = room.currentVP ? room.currentVP.name : null;
         
         io.to(roomCode).emit('policyUpdated', { enactedPolicies: room.enactedPolicies, electionTracker: room.electionTracker, playerCount: room.players.length });
         
@@ -169,11 +177,14 @@ io.on('connection', (socket) => {
 
     function handlePower(roomCode, count) {
         const room = rooms[roomCode];
-        const total = room.players.length;
-        if ((count === 1 && total >= 9) || (count === 2 && total >= 7)) io.to(room.currentPres.id).emit('triggerInvestigate');
-        else if (count === 3) io.to(room.currentPres.id).emit('triggerPeek', room.deck.slice(0, 3));
-        else if (count === 4 || count === 5) io.to(room.currentPres.id).emit('triggerExpel');
-        else startNewRound(room);
+        if ((count === 1 && room.players.length >= 9) || (count === 2 && room.players.length >= 7)) {
+            io.to(room.currentPres.id).emit('triggerInvestigate');
+        } else if (count === 3) {
+            shuffleIfNecessary(room, 3);
+            io.to(room.currentPres.id).emit('triggerPeek', room.deck.slice(0, 3));
+        } else if (count === 4 || count === 5) {
+            io.to(room.currentPres.id).emit('triggerExpel');
+        } else startNewRound(room);
     }
 
     socket.on('powerInvestigate', (name) => {

@@ -14,97 +14,122 @@
 
         body { background: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; height: 100vh; overflow: hidden; }
         
-        #lobby-screen { position: fixed; inset: 0; background: var(--bg); z-index: 2000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        .setup-card { background: #1a1a1a; padding: 40px; border-radius: 8px; border: 2px solid var(--p-gold); text-align: center; box-shadow: 0 0 30px rgba(0,0,0,0.8); }
+        /* SIDEBAR FIX: Using flex-direction column with fixed identity area at bottom */
+        #sidebar { 
+            width: 300px; 
+            background: #000; 
+            border-right: 2px solid var(--p-gold); 
+            display: flex; 
+            flex-direction: column; 
+            height: 100vh; 
+        }
+
+        #sidebar-header { padding: 15px 15px 5px 15px; flex-shrink: 0; }
         
-        /* SIDEBAR & CHAT */
-        #sidebar { width: 320px; background: #000; border-right: 2px solid var(--p-gold); padding: 15px; display: flex; flex-direction: column; }
-        #player-list { flex: 0 0 40%; overflow-y: auto; margin-bottom: 10px; border-bottom: 1px solid #222; }
+        #player-list { 
+            flex: 0 1 auto; /* Allow it to grow but also shrink */
+            overflow-y: auto; 
+            padding: 0 15px;
+            max-height: 35%; /* Caps the player list height */
+        }
         
-        #chat-container { flex: 1; display: flex; flex-direction: column; background: #050505; border-radius: 4px; border: 1px solid #222; }
+        #chat-container { 
+            flex: 1; /* Chat takes up the remaining middle space */
+            display: flex; 
+            flex-direction: column; 
+            background: #050505; 
+            margin: 10px 15px;
+            border: 1px solid #222;
+            min-height: 150px;
+        }
+
         #chat-history { flex: 1; overflow-y: auto; padding: 10px; font-size: 0.85rem; }
-        #chat-input-area { display: flex; border-top: 1px solid #222; }
-        #chat-msg { flex: 1; background: transparent; border: none; color: white; padding: 10px; outline: none; }
         
-        .chat-line { margin-bottom: 5px; line-height: 1.4; }
-        .chat-user { color: var(--p-gold); font-weight: bold; }
-        .chat-sys { color: #888; font-style: italic; }
+        #identity-area { 
+            flex-shrink: 0; /* Never allow this area to be squished */
+            padding: 15px; 
+            background: #111;
+            border-top: 2px solid var(--p-gold);
+        }
 
-        /* GAME AREA */
+        /* Lobby */
+        #lobby-screen { position: fixed; inset: 0; background: var(--bg); z-index: 2000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .setup-card { background: #1a1a1a; padding: 40px; border-radius: 8px; border: 2px solid var(--p-gold); text-align: center; }
+
+        /* Game Area */
         #game-area { flex-grow: 1; padding: 20px; display: flex; flex-direction: column; align-items: center; overflow-y: auto; gap: 20px; }
-        .track-container { background: rgba(255,255,255,0.02); padding: 20px; border-radius: 12px; width: 95%; max-width: 850px; text-align: center; border: 1px solid #222; }
-        .track { display: flex; gap: 10px; justify-content: center; margin-top: 10px; }
-        .slot { width: 85px; height: 120px; border: 2px dashed #333; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: bold; }
-        .slot.filled-tradition { background: var(--p-gold); color: black; border-style: solid; box-shadow: 0 0 10px var(--p-gold); }
-        .slot.filled-construction { background: var(--iu-red); color: white; border-style: solid; box-shadow: 0 0 10px var(--iu-red); }
+        .track-container { background: rgba(255,255,255,0.02); padding: 20px; border-radius: 12px; width: 95%; max-width: 800px; text-align: center; border: 1px solid #222; }
+        .track { display: flex; gap: 8px; justify-content: center; margin-top: 10px; }
+        .slot { width: 80px; height: 110px; border: 1px dashed #444; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; }
+        .slot.filled-tradition { background: var(--p-gold); color: black; border-style: solid; }
+        .slot.filled-construction { background: var(--iu-red); color: white; border-style: solid; }
 
-        .player-item { background: #151515; margin: 4px 0; padding: 10px; border-radius: 4px; border-left: 4px solid #333; position: relative; font-size: 0.9rem; }
+        .player-item { background: #151515; margin: 4px 0; padding: 8px; border-radius: 4px; border-left: 4px solid #333; font-size: 0.85rem; position: relative; }
         .player-item.is-pres { border-left-color: var(--p-gold); }
-        .player-item.term-limited { opacity: 0.4; }
-        .badge { position: absolute; right: 5px; font-size: 0.6rem; padding: 2px 4px; border-radius: 2px; }
-        .badge-pres { background: var(--p-gold); color: black; }
+        .badge-pres { position: absolute; right: 5px; top: 8px; background: var(--p-gold); color: black; font-size: 0.6rem; padding: 2px 4px; border-radius: 2px; }
 
-        #vote-overlay, #policy-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 1000; display: none; flex-direction: column; align-items: center; justify-content: center; }
-        .btn { padding: 10px 20px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; text-transform: uppercase; }
-        .btn-gold { background: var(--p-gold); color: black; }
-        .policy-card { width: 130px; height: 180px; margin: 10px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; cursor: pointer; border: 4px solid transparent; font-weight: bold; }
-        
         #status-bar { background: #1a1a1a; color: var(--p-gold); padding: 10px 25px; border-radius: 20px; border: 1px solid var(--p-gold); font-weight: bold; }
-        #nomination-zone { background: #1a1a1a; padding: 15px; border-radius: 8px; border: 1px solid #333; display: none; text-align: center; }
+        #nomination-zone { display: none; padding: 15px; background: #1a1a1a; border-radius: 8px; border: 1px solid #333; }
+        
+        #vote-overlay, #policy-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 1000; display: none; flex-direction: column; align-items: center; justify-content: center; }
+        .btn { padding: 10px 20px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; }
+        .btn-gold { background: var(--p-gold); color: black; }
+        .policy-card { width: 120px; height: 170px; margin: 10px; border-radius: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-weight: bold; }
     </style>
 </head>
 <body>
 
     <div id="lobby-screen">
         <div class="setup-card">
-            <h1 style="color: var(--p-gold); margin: 0;">🔔 UNDER THE BELL TOWER</h1>
-            <p style="opacity: 0.6; font-size: 0.8rem; letter-spacing: 2px; margin-bottom: 20px;">PURDUE SOCIAL DEDUCTION</p>
+            <h1 style="color: var(--p-gold);">🔔 UNDER THE BELL TOWER</h1>
             <div id="join-controls">
-                <input id="username" placeholder="Student Name" style="padding: 12px; width: 220px; background: #000; border: 1px solid #444; color: white; border-radius: 4px;">
+                <input id="username" placeholder="Student Name" style="padding: 10px; background: #000; border: 1px solid #444; color: white;">
                 <button class="btn btn-gold" onclick="joinGame()">Enter</button>
             </div>
             <div id="lobby-waiting" style="display: none;">
-                <div id="lobby-list" style="margin-bottom: 15px;"></div>
+                <div id="lobby-list" style="margin: 20px 0;"></div>
                 <button class="btn btn-gold" onclick="startGame()">Start Semester</button>
             </div>
         </div>
     </div>
 
     <div id="sidebar">
-        <h4 style="color: var(--p-gold); margin: 0 0 10px 0;">CAMPUS DIRECTORY</h4>
+        <div id="sidebar-header">
+            <h4 style="color: var(--p-gold); margin: 0;">CAMPUS DIRECTORY</h4>
+        </div>
+        
         <div id="player-list"></div>
         
         <div id="chat-container">
             <div id="chat-history"></div>
-            <div id="chat-input-area">
-                <input id="chat-msg" placeholder="Debate strategy..." onkeydown="if(event.key==='Enter') sendChat()">
+            <div style="display: flex; border-top: 1px solid #222;">
+                <input id="chat-msg" placeholder="Debate..." style="flex:1; background:transparent; border:none; color:white; padding:10px; outline:none;" onkeydown="if(event.key==='Enter') sendChat()">
             </div>
         </div>
 
-        <div style="margin-top: 15px; border-top: 1px solid #222; padding-top: 10px;">
-            <p id="role-display" style="font-size: 0.8rem; color: #888;">Role: [Hidden]</p>
-            <button class="btn btn-gold" style="width: 100%; font-size: 0.7rem;" onmousedown="revealRole()" onmouseup="hideRole()" ontouchstart="revealRole()" ontouchend="hideRole()">Hold to Reveal Identity</button>
+        <div id="identity-area">
+            <p id="role-display" style="font-size: 0.8rem; color: #888; margin-top:0;">Identity: [Hidden]</p>
+            <button class="btn btn-gold" style="width: 100%;" onmousedown="revealRole()" onmouseup="hideRole()" ontouchstart="revealRole()" ontouchend="hideRole()">Hold to Reveal</button>
         </div>
     </div>
 
     <div id="game-area">
-        <div id="status-bar">Waiting for session...</div>
+        <div id="status-bar">Waiting...</div>
 
         <div class="track-container">
-            <h5 style="margin: 0;">TRADITION TRACK</h5>
+            <h5 style="margin:0">TRADITION TRACK</h5>
             <div class="track" id="tradition-track"></div>
         </div>
 
         <div class="track-container">
-            <h5 style="margin: 0;">CONSTRUCTION TRACK</h5>
+            <h5 style="margin:0">CONSTRUCTION TRACK</h5>
             <div class="track" id="construction-track"></div>
-            <small style="opacity: 0.5;">Tracker: <span id="tracker-val">0</span>/3</small>
+            <small>Tracker: <span id="tracker-val">0</span>/3</small>
         </div>
 
         <div id="nomination-zone">
-            <p style="color: var(--p-gold); font-size: 0.8rem; margin-top: 0;">PRESIDENTIAL NOMINATION</p>
-            <input id="vp-input" placeholder="Target Name" style="padding: 8px; background: #000; border: 1px solid #444; color: white; border-radius: 4px; width: 140px;">
-            <button class="btn btn-gold" style="padding: 8px 15px;" onclick="nominate()">Confirm</button>
+            <input id="vp-input" placeholder="Nominate VP" style="padding: 8px; background: #000; border: 1px solid #444; color: white;">
+            <button class="btn btn-gold" onclick="nominate()">Confirm</button>
         </div>
 
         <button id="draw-btn" class="btn btn-gold" style="display: none; padding: 15px 30px;" onclick="drawPolicies()">Draw 3 Cards</button>
@@ -126,31 +151,23 @@
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
-        let myName = "", myRole = "", myParty = "";
+        let myRole = "", myParty = "";
 
-        // CHAT LOGIC
         function sendChat() {
             const input = document.getElementById('chat-msg');
-            if (input.value.trim()) {
-                socket.emit('sendChat', input.value.trim());
-                input.value = '';
-            }
+            if (input.value.trim()) { socket.emit('sendChat', input.value.trim()); input.value = ''; }
         }
 
         socket.on('chatMessage', (data) => {
             const history = document.getElementById('chat-history');
-            const isSys = data.user === "SYSTEM";
-            history.innerHTML += `<div class="chat-line ${isSys ? 'chat-sys' : ''}">
-                ${!isSys ? `<span class="chat-user">${data.user}:</span> ` : ''}${data.msg}
-            </div>`;
+            history.innerHTML += `<div><span style="color:var(--p-gold)">${data.user}:</span> ${data.msg}</div>`;
             history.scrollTop = history.scrollHeight;
         });
 
-        // CORE GAME LOGIC
         function joinGame() {
-            myName = document.getElementById('username').value.trim();
-            if (myName) {
-                socket.emit('joinGame', myName);
+            const name = document.getElementById('username').value.trim();
+            if (name) {
+                socket.emit('joinGame', name);
                 document.getElementById('join-controls').style.display = 'none';
                 document.getElementById('lobby-waiting').style.display = 'block';
             }
@@ -160,8 +177,8 @@
 
         socket.on('updatePlayerList', (data) => {
             const html = data.map(p => `
-                <div class="player-item ${p.isPres ? 'is-pres' : ''} ${p.isLimit ? 'term-limited' : ''}">
-                    ${p.name} ${p.isPres ? '<span class="badge badge-pres">PRES</span>' : ''}
+                <div class="player-item ${p.isPres ? 'is-pres' : ''}">
+                    ${p.name} ${p.isPres ? '<span class="badge-pres">PRES</span>' : ''}
                 </div>`).join('');
             document.getElementById('player-list').innerHTML = html;
             document.getElementById('lobby-list').innerHTML = html;
@@ -169,13 +186,14 @@
 
         socket.on('gameStarted', () => { document.getElementById('lobby-screen').style.display = 'none'; });
         socket.on('assignRole', (data) => { myRole = data.role; myParty = data.party; });
+        
         function revealRole() {
             const d = document.getElementById('role-display');
             d.innerText = `Identity: ${myRole}`;
             d.style.color = myParty === 'Liberal' ? 'var(--p-gold)' : 'var(--iu-red)';
         }
         function hideRole() {
-            document.getElementById('role-display').innerText = `Role: [Hidden]`;
+            document.getElementById('role-display').innerText = `Identity: [Hidden]`;
             document.getElementById('role-display').style.color = '#888';
         }
 
@@ -194,14 +212,9 @@
             document.getElementById('vote-overlay').style.display = 'flex';
         });
 
-        function castVote(c) {
-            socket.emit('submitVote', c);
-            document.getElementById('vote-overlay').style.display = 'none';
-        }
-
+        function castVote(c) { socket.emit('submitVote', c); document.getElementById('vote-overlay').style.display = 'none'; }
         socket.on('presDrawPhase', () => { document.getElementById('draw-btn').style.display = 'block'; });
         function drawPolicies() { socket.emit('drawThree'); document.getElementById('draw-btn').style.display = 'none'; }
-
         socket.on('presDiscardPhase', (hand) => { showPolicyOverlay(hand, "PRESIDENT: Discard 1", true); });
         socket.on('vpEnactPhase', (hand) => { showPolicyOverlay(hand, "VICE PRESIDENT: Enact 1", false); });
 

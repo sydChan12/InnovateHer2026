@@ -105,6 +105,19 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('drawThree', () => {
+        if (socket.id !== currentPres.id) return; // Only President can draw
+        const hand = [deck.shift(), deck.shift(), deck.shift()];
+        io.to(currentPres.id).emit('presDiscardPhase', hand);
+    });
+
+    socket.on('presDiscard', (remaining) => {
+        if (socket.id !== currentPres.id) return; // Only President can discard
+        discardPile.push(...remaining.splice(1)); // Discard 2, keep 1 for VP
+        const vpHand = remaining;
+        io.to(currentVP.id).emit('vpEnactPhase', vpHand);
+    });
+
     socket.on('vpEnact', (chosen) => {
         chosen === "Tradition" ? enactedPolicies.tradition++ : enactedPolicies.construction++;
         lastPresident = currentPres.name; // Record last elected officials [cite: 96]

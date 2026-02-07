@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Bell Tower Purdue Edition</title>
+    <style>
+        :root { --p-gold: #CEB888; --iu-red: #990000; --bg: #0b0b0b; }
+        body { background: var(--bg); color: white; font-family: sans-serif; margin: 0; display: flex; height: 100vh; overflow: hidden; }
+        #setup-screen { position: fixed; inset: 0; background: var(--bg); z-index: 2000; display: flex; align-items: center; justify-content: center; }
+        .card { background: #111; padding: 30px; border: 2px solid var(--p-gold); border-radius: 8px; width: 320px; text-align: center; }
+        input { padding: 10px; margin: 5px; width: 80%; background: #000; color: white; border: 1px solid #444; }
+        .btn { padding: 10px 20px; border: none; font-weight: bold; cursor: pointer; border-radius: 4px; margin-top: 10px; }
+        .btn-gold { background: var(--p-gold); color: black; }
+        #sidebar { width: 280px; background: #000; border-right: 1px solid #333; display: flex; flex-direction: column; }
+        #player-list { flex: 1; padding: 15px; overflow-y: auto; }
+        #game-area { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 20px; overflow-y: auto; }
+        .track { display: flex; gap: 10px; margin: 15px 0; }
+        .slot { width: 80px; height: 110px; border: 1px dashed #444; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 0.6rem; font-weight: bold; text-align: center; }
+        .filled-construction { background: var(--iu-red); border-style: solid; }
+        .filled-tradition { background: var(--p-gold); color: black; border-style: solid; }
+        .power-tag { position: absolute; bottom: -20px; font-size: 0.5rem; color: var(--p-gold); }
+        #overlay, #vote-overlay, #policy-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.95); display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 1000; }
+        .policy-card { width: 110px; height: 160px; margin: 10px; border-radius: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-weight: bold; }
+        #chat-history { height: 150px; overflow-y: auto; padding: 10px; background: #050505; border-top: 1px solid #222; font-size: 0.8rem; }
+    </style>
+</head>
+<body>
+
+    <div id="setup-screen">
+        <div class="card" id="start-card">
+            <h2 style="color:var(--p-gold)">THE BELL TOWER</h2>
+            <input id="user-name" placeholder="Your Name">
+            <button class="btn btn-gold" onclick="showCreate()">Create Room</button>
+            <button class="btn" style="background:#222; color:white;" onclick="showJoin()">Join Room</button>
+        </div>
+        <div class="card" id="lobby-card" style="display:none">
+            <h3 id="room-display"></h3>
+            <div id="lobby-players" style="text-align:left; margin:15px 0; font-size:0.9rem"></div>
+            <button id="host-start-btn" class="btn btn-gold" style="display:none" onclick="socket.emit('startGame')">Start Game</button>
+            <p id="wait-msg" style="font-size:0.8rem; opacity:0.6">Waiting for host...</p>
+        </div>
+    </div>
+
+    <div id="sidebar">
+        <div id="player-list"></div>
+        <div id="chat-history"></div>
+        <input id="chat-msg" placeholder="Chat..." onkeydown="if(event.key==='Enter') sendChat()" style="width:100%; border:none; box-sizing:border-box;">
+        <div style="padding:15px; background:#111; border-top:1px solid var(--p-gold)">
+            <p id="id-text" style="font-size:0.7rem; color:#888">Identity: [Hidden]</p>
+            <button class="btn btn-gold" style="width:100%" onmousedown="reveal(true)" onmouseup="reveal(false)">HOLD REVEAL</button>
+        </div>
+    </div>
+
+    <div id="game-area">
+        <div id="status" style="border:1px solid var(--p-gold); padding:10px 20px; border-radius:20px; margin-bottom:20px">Join a room...</div>
+        <div><h5>TRADITION</h5><div class="track" id="tradition-track"></div></div>
+        <div style="margin-top:20px"><h5>CONSTRUCTION</h5><div class="track" id="construction-track"></div></div>
+        <div id="nom-zone" style="display:none; margin-top:20px">
+            <select id="vp-sel" style="padding:10px; background:#000; color:white; border:1px solid var(--p-gold)"></select>
+            <button class="btn btn-gold" onclick="socket.emit('nominateVP', document.getElementById('vp-sel').value)">Nominate</button>
+        </div>
+        <button id="draw-btn" class="btn btn-gold" style="display:none" onclick="socket.emit('drawThree')">Draw 3</button>
+    </div>
+
+    <div id="vote-overlay">
+        <h2 id="v-prompt"></h2>
+        <button class="btn btn-gold" style="width:150px" onclick="cast('Boiler Up!')">BOILER UP!</button>
+        <button class="btn" style="background:var(--iu-red); width:150px" onclick="cast('Hammer Down!')">HAMMER DOWN!</button>
+    </div>
+
+    <div id="policy-overlay">
+        <h2 id="p-prompt"></h2>
+        <div id="p-choices" style="display:flex"></div>
+    </div>
+
+    <div id="overlay"><h2 id="o-title"></h2><div id="o-content"></div></div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        let myCode = "", myName = "", amHost = false, players = [];
+
+        function showCreate() {
+            myName = document.getElementById('user-name').value;
+            if(myName) socket.emit('createRoom', myName);
+        }
+
+        function showJoin() {
+            myName = document.getElementById('user-name').value;
+            let code = prompt("Enter 5-digit Room Code:");
+            if(myName && code) socket.emit('joinRoom', { roomCode: code, userName: myName });
+        }
+
+        socket.on('joinedRoom', d => {
+            myCode = d.roomCode; amHost = d.isHost;
+            document.getElementById('start-card').style.display = 'none';
+            document.getElementById('lobby-card').style.display = 'block';
+            document.getElementById('room-display').innerText = `ROOM: ${myCode}`;
+            if(amHost) {
+                document.getElementById('host-start-btn').style.display = 'block';
+                document.getElementById('wait-msg').style.display = 'none';
+            }
+        });
+
+        socket.on('updatePlayerList', data => {
+            players = data;
+            let listHtml = data.map(p => `<div>${p.name} ${p.isPres?'👑':''}</div>`).join('');
+            document.getElementById('lobby-players').innerHTML = listHtml;
+            document.getElementById('player-list').innerHTML = data.map(p => `<div style="padding:5px; margin:2px; background:#111; border-left:3px solid ${p.isPres?'var(--p-gold)':'#333'} ${!p.alive?'opacity:0.3':''}">${p.name}</div>`).join('');
+        });
+
+        socket.on('gameStarted', () => document.getElementById('setup-screen').style.display = 'none');
+        
+        socket.on('assignRole', d => {
+            window.roleData = d;
+            document.getElementById('id-text').innerText = "Identity: [Hidden]";
+        });
+
+        function reveal(s) { document.getElementById('id-text').innerText = s ? `${window.roleData.role}\n${window.roleData.info}` : "Identity: [Hidden]"; }
+
+        socket.on('policyUpdated', d => {
+            const ct = document.getElementById('construction-track'); ct.innerHTML = '';
+            for(let i=1; i<=6; i++){
+                let p = "";
+                if(i===1 && d.playerCount>=9) p="Investigate";
+                if(i===2 && d.playerCount>=7) p="Investigate";
+                if(i===3) p="Peek";
+                if(i===4 || i===5) p="Expel";
+                const filled = i <= d.enactedPolicies.construction;
+                ct.innerHTML += `<div class="slot ${filled?'filled-construction':''}">${filled?'IU':i}<div class="power-tag">${p}</div></div>`;
+            }
+            const tt = document.getElementById('tradition-track'); tt.innerHTML = '';
+            for(let i=1; i<=5; i++){
+                const filled = i <= d.enactedPolicies.tradition;
+                tt.innerHTML += `<div class="slot ${filled?'filled-tradition':''}">${filled?'PURDUE':i}</div>`;
+            }
+        });
+
+        socket.on('newRound', d => {
+            document.getElementById('status').innerText = `Pres: ${d.presidentName}`;
+            if(socket.id === d.presidentId){
+                document.getElementById('nom-zone').style.display = 'block';
+                document.getElementById('vp-sel').innerHTML = players.filter(p => p.name !== d.presidentName && p.alive && !p.isLimit).map(p => `<option value="${p.name}">${p.name}</option>`).join('');
+            } else document.getElementById('nom-zone').style.display = 'none';
+        });
+
+        socket.on('startVoting', d => {
+            document.getElementById('v-prompt').innerText = `Elect ${d.pres} & ${d.vp}?`;
+            document.getElementById('vote-overlay').style.display = 'flex';
+        });
+
+        function cast(v) { socket.emit('submitVote', v); document.getElementById('vote-overlay').style.display = 'none'; }
+        socket.on('presDrawPhase', () => document.getElementById('draw-btn').style.display = 'block');
+        socket.on('presDiscardPhase', h => showP(h, true));
+        socket.on('vpEnactPhase', d => showP(d.cards, false));
+
+        function showP(cards, isP) {
+            document.getElementById('p-prompt').innerText = isP ? "Discard 1" : "Enact 1";
+            document.getElementById('p-choices').innerHTML = cards.map((c,i) => `<div class="policy-card" style="background:${c==='Tradition'?'var(--p-gold)':'var(--iu-red)'}" onclick="chooseP(${isP}, ${i}, '${c}', ${JSON.stringify(cards).replace(/"/g, '&quot;')})">${c}</div>`).join('');
+            document.getElementById('policy-overlay').style.display = 'flex';
+            document.getElementById('draw-btn').style.display = 'none';
+        }
+
+        function chooseP(isP, idx, card, hand) {
+            document.getElementById('policy-overlay').style.display='none';
+            if(isP) { hand.splice(idx,1); socket.emit('presDiscard', hand); }
+            else socket.emit('vpEnact', card);
+        }
+
+        socket.on('triggerInvestigate', () => pwr("Investigate", "powerInvestigate"));
+        socket.on('triggerExpel', () => pwr("Expel", "powerExpel"));
+        function pwr(t, e) {
+            document.getElementById('o-title').innerText = t;
+            let ops = players.filter(p => p.alive && socket.id !== p.id).map(p => `<option value="${p.name}">${p.name}</option>`).join('');
+            document.getElementById('o-content').innerHTML = `<select id="o-sel">${ops}</select><button class="btn btn-gold" onclick="socket.emit('${e}', document.getElementById('o-sel').value); document.getElementById('overlay').style.display='none'">Go</button>`;
+            document.getElementById('overlay').style.display = 'flex';
+        }
+
+        socket.on('triggerPeek', cs => {
+            document.getElementById('o-title').innerText = "Peek";
+            document.getElementById('o-content').innerHTML = cs.map(c => `<div style="padding:10px; margin:5px; background:${c==='Tradition'?'var(--p-gold)':'var(--iu-red)'}">${c}</div>`).join('') + `<button class="btn btn-gold" onclick="socket.emit('peekFinished'); document.getElementById('overlay').style.display='none'">Done</button>`;
+            document.getElementById('overlay').style.display = 'flex';
+        });
+
+        socket.on('investigateResult', d => alert(`${d.name} is ${d.party === 'Fascist' ? 'Spy/Bison' : 'Boilermaker'}`));
+        socket.on('gameOver', m => { alert(m); location.reload(); });
+        socket.on('chatMessage', d => {
+            const h = document.getElementById('chat-history'); h.innerHTML += `<div><b>${d.user}:</b> ${d.msg}</div>`; h.scrollTop = h.scrollHeight;
+        });
+        function sendChat() { const i = document.getElementById('chat-msg'); if(i.value) { socket.emit('sendChat', i.value); i.value = ''; } }
+        socket.on('errorMsg', m => alert(m));
+    </script>
+</body>
+</html>

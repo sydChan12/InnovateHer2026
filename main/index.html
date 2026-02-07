@@ -6,13 +6,13 @@
     <title>Under the Bell Tower | Purdue Edition</title>
     <style>
         :root { --p-gold: #CEB888; --p-black: #000000; --iu-red: #990000; --bg: #0b0b0b; }
-        body { background: var(--bg); color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; display: flex; height: 100vh; overflow: hidden; }
+        body { background: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; height: 100vh; overflow: hidden; }
         
         /* Lobby Screen */
         #lobby-screen { position: fixed; inset: 0; background: var(--bg); z-index: 2000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
         .setup-card { background: #1a1a1a; padding: 40px; border-radius: 8px; border: 2px solid var(--p-gold); text-align: center; box-shadow: 0 0 30px rgba(0,0,0,0.8); }
         
-        /* Sidebar inspired by Secret-Hitler.online */
+        /* Sidebar */
         #sidebar { width: 280px; background: #000; border-right: 2px solid var(--p-gold); padding: 20px; display: flex; flex-direction: column; }
         .player-item { background: #1a1a1a; margin: 8px 0; padding: 15px; border-radius: 4px; border-left: 5px solid #444; position: relative; font-weight: bold; transition: 0.3s; }
         .player-item.is-pres { border-left-color: var(--p-gold); background: #222; }
@@ -25,17 +25,16 @@
         #game-area { flex-grow: 1; padding: 30px; display: flex; flex-direction: column; align-items: center; justify-content: space-around; }
         .track-container { background: rgba(255,255,255,0.02); padding: 25px; border-radius: 15px; width: 95%; max-width: 900px; text-align: center; border: 1px solid #222; }
         .track { display: flex; gap: 12px; justify-content: center; margin-top: 15px; }
-        .slot { width: 95px; height: 135px; border: 2px dashed #333; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: bold; text-align: center; transition: all 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
-        .slot.filled-tradition { background: var(--p-gold); color: black; border-style: solid; box-shadow: 0 0 15px var(--p-gold); transform: scale(1.05); }
-        .slot.filled-construction { background: var(--iu-red); color: white; border-style: solid; box-shadow: 0 0 15px var(--iu-red); transform: scale(1.05); }
+        .slot { width: 95px; height: 135px; border: 2px dashed #333; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: bold; text-align: center; transition: all 0.5s; }
+        .slot.filled-tradition { background: var(--p-gold); color: black; border-style: solid; box-shadow: 0 0 15px var(--p-gold); }
+        .slot.filled-construction { background: var(--iu-red); color: white; border-style: solid; box-shadow: 0 0 15px var(--iu-red); }
 
         /* Overlays */
         #vote-overlay, #policy-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.97); z-index: 1000; display: none; flex-direction: column; align-items: center; justify-content: center; }
         
-        /* UI Elements */
+        /* Buttons & Cards */
         .btn { padding: 12px 28px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; text-transform: uppercase; transition: 0.2s; }
         .btn-gold { background: var(--p-gold); color: black; }
-        .btn-gold:hover { background: #e0ca9e; transform: translateY(-2px); }
         .policy-card { width: 140px; height: 200px; margin: 15px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; cursor: pointer; border: 5px solid transparent; transition: 0.2s; font-weight: 900; }
         .policy-card:hover { transform: translateY(-10px); border-color: white; }
 
@@ -49,26 +48,22 @@
         <div class="setup-card">
             <h1 style="color: var(--p-gold); margin: 0; font-size: 2.5rem;">🔔 UNDER THE BELL TOWER</h1>
             <p style="margin: 10px 0 30px; opacity: 0.6; letter-spacing: 2px;">BOILERMAKERS vs. HOOSIERS</p>
-            
             <div id="join-controls">
-                <input id="username" placeholder="Enter Purdue ID Name" style="padding: 15px; width: 280px; background: #000; border: 1px solid #444; color: white; border-radius: 4px; margin-bottom: 20px; font-size: 1rem;">
+                <input id="username" placeholder="Enter Purdue ID Name" style="padding: 15px; width: 280px; background: #000; border: 1px solid #444; color: white; border-radius: 4px; margin-bottom: 20px;">
                 <br>
                 <button class="btn btn-gold" onclick="joinGame()">Join Session</button>
             </div>
-
             <div id="lobby-waiting" style="display: none;">
-                <h3 style="color: var(--p-gold)">Waiting for Students...</h3>
-                <div id="lobby-list" style="margin-bottom: 20px; text-align: left; display: inline-block; width: 100%;"></div>
-                <br>
-                <button class="btn btn-gold" onclick="startGame()">Start Semester (5+ Players)</button>
+                <h3 style="color: var(--p-gold)">Lobby</h3>
+                <div id="lobby-list" style="margin-bottom: 20px;"></div>
+                <button class="btn btn-gold" onclick="startGame()">Start Semester</button>
             </div>
         </div>
     </div>
 
     <div id="sidebar">
-        <h3 style="color: var(--p-gold); border-bottom: 1px solid #333; padding-bottom: 10px; margin-top: 0;">CAMPUS DIRECTORY</h3>
+        <h3 style="color: var(--p-gold); border-bottom: 1px solid #333; padding-bottom: 10px;">CAMPUS DIRECTORY</h3>
         <div id="player-list"></div>
-        
         <div style="margin-top: auto; padding-top: 20px; border-top: 1px solid #333;">
             <p id="role-display" style="font-size: 0.9rem; margin-bottom: 10px; color: #888;">Role: [Hidden]</p>
             <button class="btn btn-gold" style="width: 100%" onmousedown="revealRole()" onmouseup="hideRole()" ontouchstart="revealRole()" ontouchend="hideRole()">Reveal Secret Identity</button>
@@ -76,38 +71,38 @@
     </div>
 
     <div id="game-area">
-        <div id="status-bar">Connecting to server...</div>
+        <div id="status-bar">Connecting...</div>
 
         <div class="track-container">
-            <h4 style="margin: 0; letter-spacing: 1px;">TRADITION TRACK (Boilermakers)</h4>
+            <h4>TRADITION TRACK (Boilers)</h4>
             <div class="track" id="tradition-track"></div>
         </div>
 
         <div class="track-container">
-            <h4 style="margin: 0; letter-spacing: 1px;">CONSTRUCTION TRACK (Hoosiers)</h4>
+            <h4>CONSTRUCTION TRACK (Hoosiers)</h4>
             <div class="track" id="construction-track"></div>
-            <div style="margin-top: 20px; opacity: 0.5; font-size: 0.8rem;">ELECTION TRACKER: <span id="tracker-val">0</span> / 3</div>
+            <div style="margin-top: 15px; opacity: 0.6;">ELECTION TRACKER: <span id="tracker-val">0</span> / 3</div>
         </div>
 
         <div id="nomination-zone">
-            <p style="margin-top: 0; font-weight: bold; color: var(--p-gold);">PRESIDENTIAL ACTION: NOMINATE VICE PRESIDENT</p>
-            <input id="vp-input" placeholder="Type Student Name" style="padding: 12px; background: #000; border: 1px solid #444; color: white; border-radius: 4px; width: 200px;">
-            <button class="btn btn-gold" onclick="nominate()">Confirm Nominee</button>
+            <p style="color: var(--p-gold); font-weight: bold;">PRESIDENTIAL ACTION: NOMINATE VP</p>
+            <input id="vp-input" placeholder="Type Name" style="padding: 12px; background: #000; border: 1px solid #444; color: white; border-radius: 4px;">
+            <button class="btn btn-gold" onclick="nominate()">Confirm</button>
         </div>
 
-        <button id="draw-btn" class="btn btn-gold" style="display: none; padding: 20px 40px; font-size: 1.2rem;" onclick="drawPolicies()">Draw 3 Policies</button>
+        <button id="draw-btn" class="btn btn-gold" style="display: none;" onclick="drawPolicies()">Draw 3 Policies</button>
     </div>
 
     <div id="vote-overlay">
-        <h1 id="vote-prompt" style="font-size: 2.5rem; text-align: center;">CONFIRM GOVERNMENT?</h1>
+        <h1 id="vote-prompt" style="text-align: center;">CONFIRM GOVERNMENT?</h1>
         <div style="display: flex; gap: 40px; margin-top: 40px;">
-            <button class="btn btn-gold" onclick="castVote('Boiler Up!')" style="font-size: 2rem; padding: 40px 60px; border-radius: 10px;">🚂 BOILER UP!</button>
-            <button onclick="castVote('Hammer Down!')" style="background: var(--iu-red); color: white; border: none; border-radius: 10px; padding: 40px 60px; font-weight: bold; font-size: 2rem; cursor: pointer;">🔨 HAMMER DOWN!</button>
+            <button class="btn btn-gold" onclick="castVote('Boiler Up!')" style="font-size: 2rem; padding: 40px 60px;">🚂 BOILER UP!</button>
+            <button onclick="castVote('Hammer Down!')" style="background: var(--iu-red); color: white; padding: 40px 60px; font-size: 2rem; border: none; border-radius: 10px; cursor: pointer;">🔨 HAMMER DOWN!</button>
         </div>
     </div>
 
     <div id="policy-overlay">
-        <h2 id="policy-prompt" style="font-size: 2rem; color: var(--p-gold);">LEGISLATIVE SESSION</h2>
+        <h2 id="policy-prompt" style="color: var(--p-gold);">LEGISLATIVE SESSION</h2>
         <div id="policy-choices" style="display: flex;"></div>
     </div>
 
@@ -117,8 +112,7 @@
         let myName = "", myRole = "", myParty = "";
 
         function joinGame() {
-            const input = document.getElementById('username');
-            myName = input.value.trim();
+            myName = document.getElementById('username').value.trim();
             if (myName) {
                 socket.emit('joinGame', myName);
                 document.getElementById('join-controls').style.display = 'none';
@@ -129,58 +123,33 @@
         function startGame() { socket.emit('startGame'); }
 
         socket.on('updatePlayerList', (data) => {
-            // data can be array of names or objects with status
-            const listContainer = document.getElementById('player-list');
-            const lobbyContainer = document.getElementById('lobby-list');
-            
-            const html = data.map(p => {
-                const name = typeof p === 'string' ? p : p.name;
-                const isPres = p.isPres ? 'is-pres' : '';
-                const isLimit = p.isLimit ? 'term-limited' : '';
-                return `
-                    <div class="player-item ${isPres} ${isLimit}">
-                        🚂 ${name}
-                        ${p.isPres ? '<span class="badge badge-pres">PRES</span>' : ''}
-                        ${p.isLimit ? '<span class="badge badge-limit">LIMIT</span>' : ''}
-                    </div>`;
-            }).join('');
-
-            listContainer.innerHTML = html;
-            lobbyContainer.innerHTML = html;
+            const html = data.map(p => `
+                <div class="player-item ${p.isPres ? 'is-pres' : ''} ${p.isLimit ? 'term-limited' : ''}">
+                    🚂 ${p.name}
+                    ${p.isPres ? '<span class="badge badge-pres">PRES</span>' : ''}
+                    ${p.isLimit ? '<span class="badge badge-limit">LIMIT</span>' : ''}
+                </div>`).join('');
+            document.getElementById('player-list').innerHTML = html;
+            document.getElementById('lobby-list').innerHTML = html;
         });
 
-        socket.on('gameStarted', () => {
-            document.getElementById('lobby-screen').style.display = 'none';
-        });
+        socket.on('gameStarted', () => { document.getElementById('lobby-screen').style.display = 'none'; });
 
-        socket.on('assignRole', (data) => {
-            myRole = data.role;
-            myParty = data.party;
-        });
+        socket.on('assignRole', (data) => { myRole = data.role; myParty = data.party; });
 
-        function revealRole() { 
-            const display = document.getElementById('role-display');
-            display.innerText = `Identity: ${myRole}`;
-            display.style.color = myParty === 'Liberal' ? 'var(--p-gold)' : 'var(--iu-red)';
+        function revealRole() {
+            const d = document.getElementById('role-display');
+            d.innerText = `Identity: ${myRole}`;
+            d.style.color = myParty === 'Liberal' ? 'var(--p-gold)' : 'var(--iu-red)';
         }
-        function hideRole() { 
-            document.getElementById('role-display').innerText = `Role: [Hidden]`;
-            document.getElementById('role-display').style.color = '#888';
+        function hideRole() {
+            const d = document.getElementById('role-display');
+            d.innerText = `Role: [Hidden]`; d.style.color = '#888';
         }
-
-        // --- ROUND FLOW ---
 
         socket.on('newRound', (data) => {
-            // Hide nomination zone for everyone first
-            document.getElementById('nomination-zone').style.display = 'none';
-            document.getElementById('draw-btn').style.display = 'none';
-            
-            if (socket.id === data.presidentId) {
-                document.getElementById('nomination-zone').style.display = 'block';
-                document.getElementById('status-bar').innerText = "ACTION REQUIRED: Nominate a Vice President";
-            } else {
-                document.getElementById('status-bar').innerText = `President ${data.presidentName} is nominating...`;
-            }
+            document.getElementById('nomination-zone').style.display = socket.id === data.presidentId ? 'block' : 'none';
+            document.getElementById('status-bar').innerText = socket.id === data.presidentId ? "ACTION: Nominate a Vice President" : `President ${data.presidentName} is nominating...`;
         });
 
         function nominate() {
@@ -189,32 +158,21 @@
         }
 
         socket.on('startVoting', (data) => {
-            document.getElementById('vote-prompt').innerHTML = `Elect <span style="color:var(--p-gold)">${data.pres}</span> (Pres) & <br><span style="color:var(--p-gold)">${data.vp}</span> (VP)?`;
+            document.getElementById('vote-prompt').innerText = `Elect ${data.pres} & ${data.vp}?`;
             document.getElementById('vote-overlay').style.display = 'flex';
         });
 
-        function castVote(choice) {
-            socket.emit('submitVote', choice);
+        function castVote(c) {
+            socket.emit('submitVote', c);
             document.getElementById('vote-overlay').style.display = 'none';
         }
 
-        socket.on('presDrawPhase', () => {
-            document.getElementById('draw-btn').style.display = 'inline-block';
-            document.getElementById('status-bar').innerText = "Election Passed! Draw your cards.";
-        });
+        socket.on('presDrawPhase', () => { document.getElementById('draw-btn').style.display = 'block'; });
 
-        function drawPolicies() {
-            socket.emit('drawThree');
-            document.getElementById('draw-btn').style.display = 'none';
-        }
+        function drawPolicies() { socket.emit('drawThree'); document.getElementById('draw-btn').style.display = 'none'; }
 
-        socket.on('presDiscardPhase', (hand) => {
-            showPolicyOverlay(hand, "PRESIDENT: Discard 1 Policy", true);
-        });
-
-        socket.on('vpEnactPhase', (hand) => {
-            showPolicyOverlay(hand, "VICE PRESIDENT: Enact 1 Policy", false);
-        });
+        socket.on('presDiscardPhase', (hand) => { showPolicyOverlay(hand, "PRESIDENT: Discard 1 Policy", true); });
+        socket.on('vpEnactPhase', (hand) => { showPolicyOverlay(hand, "VICE PRESIDENT: Enact 1 Policy", false); });
 
         function showPolicyOverlay(cards, prompt, isPres) {
             document.getElementById('policy-prompt').innerText = prompt;
@@ -227,12 +185,13 @@
                 div.style.backgroundColor = card === 'Tradition' ? 'var(--p-gold)' : 'var(--iu-red)';
                 div.style.color = card === 'Tradition' ? 'black' : 'white';
                 div.innerText = card;
+                
                 div.onclick = () => {
                     document.getElementById('policy-overlay').style.display = 'none';
                     if (isPres) {
                         let remaining = [...cards];
-                        remaining.splice(index, 1);
-                        socket.emit('presDiscard', remaining);
+                        remaining.splice(index, 1); // Remove the one clicked (discarding it)
+                        socket.emit('presDiscard', remaining); // Send the other TWO to the server
                     } else {
                         socket.emit('vpEnact', card);
                     }
@@ -243,29 +202,17 @@
         }
 
         socket.on('policyUpdated', (data) => {
-            // Update Tracks
             const tt = document.getElementById('tradition-track');
             const ct = document.getElementById('construction-track');
             tt.innerHTML = ''; ct.innerHTML = '';
-
-            for(let i=0; i<5; i++) {
-                const filled = i < data.enactedPolicies.tradition;
-                tt.innerHTML += `<div class="slot ${filled ? 'filled-tradition' : ''}">${filled ? 'TRADITION' : i+1}</div>`;
-            }
-            for(let i=0; i<6; i++) {
-                const filled = i < data.enactedPolicies.construction;
-                ct.innerHTML += `<div class="slot ${filled ? 'filled-construction' : ''}">${filled ? 'CONSTRUCTION' : i+1}</div>`;
-            }
-            
+            for(let i=0; i<5; i++) tt.innerHTML += `<div class="slot ${i < data.enactedPolicies.tradition ? 'filled-tradition' : ''}">${i < data.enactedPolicies.tradition ? 'TRADITION' : i+1}</div>`;
+            for(let i=0; i<6; i++) ct.innerHTML += `<div class="slot ${i < data.enactedPolicies.construction ? 'filled-construction' : ''}">${i < data.enactedPolicies.construction ? 'CONSTRUCTION' : i+1}</div>`;
             document.getElementById('tracker-val').innerText = data.electionTracker;
         });
 
         socket.on('statusMsg', (m) => { document.getElementById('status-bar').innerText = m; });
         socket.on('errorMsg', (m) => alert(m));
-        socket.on('gameOver', (m) => {
-            alert(m);
-            location.reload();
-        });
+        socket.on('gameOver', (m) => { alert(m); location.reload(); });
     </script>
 </body>
 </html>

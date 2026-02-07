@@ -6,6 +6,7 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
+// Centralized Game State
 let players = [];
 let deck = [];
 let discardPile = [];
@@ -23,26 +24,41 @@ function createDeck() {
     discardPile = [];
 }
 
+function resetServerState() {
+    gameActive = false;
+    enactedPolicies = { tradition: 0, construction: 0 };
+    electionTracker = 0;
+    lastPresident = null;
+    lastVP = null;
+    currentPres = null;
+    currentVP = null;
+    currentVotes = {};
+    presidentialIndex = 0;
+}
+
 app.get('/', (req, res) => { res.sendFile(__dirname + '/index.html'); });
 
 io.on('connection', (socket) => {
+    // 1. FIXED JOIN LOGIC
     socket.on('joinGame', (name) => {
-        if (gameActive) return socket.emit('errorMsg', "Game in progress.");
+        const cleanName = name.trim();
+        if (!cleanName) return socket.emit('errorMsg', "Please enter a name.");
         
-        // Name duplicate check
-        const nameExists = players.some(p => p.name.toLowerCase() === name.toLowerCase());
+        if (gameActive) {
+            return socket.emit('errorMsg', "Game is already in progress. Please wait for it to end.");
+        }
+        
+        const nameExists = players.some(p => p.name.toLowerCase() === cleanName.toLowerCase());
         if (nameExists) {
             return socket.emit('errorMsg', "That name is already taken. Pick another!");
         }
 
-        players.push({ id: socket.id, name, role: 'Unassigned', party: 'Liberal', alive: true });
+        players.push({ id: socket.id, name: cleanName, role: 'Unassigned', party: 'Liberal', alive: true });
+        
+        // Ensure the joining player sees the lobby
+        socket.emit('joinedSuccessfully');
         io.emit('updatePlayerList', getPlayerListWithStatus());
-        io.emit('chatMessage', { user: "SYSTEM", msg: `${name} has joined the lobby.` });
-    });
-
-    socket.on('sendChat', (msg) => {
-        const p = players.find(p => p.id === socket.id);
-        if (p) io.emit('chatMessage', { user: p.name, msg });
+        io.emit('chatMessage', { user: "SYSTEM", msg: `${cleanName} has joined.` });
     });
 
     function getPlayerListWithStatus() {
@@ -54,37 +70,38 @@ io.on('connection', (socket) => {
         }));
     }
 
+    // 2. START GAME LOGIC
     socket.on('startGame', () => {
-        const count = players.length;
-        if (count < 5) return socket.emit('errorMsg', "Need 5+ players.");
+        if (players.length < 5) return socket.emit('errorMsg', "Need at least 5 players to start.");
+        if (gameActive) return;
+
         gameActive = true;
         createDeck();
-        enactedPolicies = { tradition: 0, construction: 0 };
-        electionTracker = 0;
         
         let shuffled = [...players].sort(() => 0.5 - Math.random());
         let bison = shuffled[0];
         bison.role = "THE BISON 🦬"; bison.party = "Fascist";
 
+        const count = players.length;
         if (count <= 6) {
             let spy = shuffled[1];
             spy.role = "HOOSIER SPY 🚩"; spy.party = "Fascist";
-            io.to(bison.id).emit('assignRole', { role: bison.role, party: bison.party, info: `Spy is: ${spy.name}` });
-            io.to(spy.id).emit('assignRole', { role: spy.role, party: spy.party, info: `Bison is: ${bison.name}` });
+            io.to(bison.id).emit('assignRole', { role: bison.role, party: bison.party, info: `Spy: ${spy.name}` });
+            io.to(spy.id).emit('assignRole', { role: spy.role, party: spy.party, info: `Bison: ${bison.name}` });
         } else {
             let spyCount = count <= 8 ? 2 : 3;
             let spies = shuffled.slice(1, 1 + spyCount);
             spies.forEach(s => { s.role = "HOOSIER SPY 🚩"; s.party = "Fascist"; });
             spies.forEach(s => {
-                let otherSpies = spies.filter(other => other.id !== s.id).map(os => os.name);
-                io.to(s.id).emit('assignRole', { role: s.role, party: s.party, info: `Bison: ${bison.name}. Spies: ${otherSpies.join(', ')}` });
+                let otherNames = spies.filter(o => o.id !== s.id).map(o => o.name);
+                io.to(s.id).emit('assignRole', { role: s.role, party: s.party, info: `Bison: ${bison.name}. Spies: ${otherNames.join(', ')}` });
             });
             io.to(bison.id).emit('assignRole', { role: bison.role, party: bison.party, info: "You do not know the spies." });
         }
 
         players.filter(p => p.role === 'Unassigned').forEach(p => {
             p.role = "BOILERMAKER 🚂"; p.party = "Liberal";
-            io.to(p.id).emit('assignRole', { role: p.role, party: p.party, info: "Find the Spies!" });
+            io.to(p.id).emit('assignRole', { role: p.role, party: p.party, info: "Stop the Bison!" });
         });
 
         io.emit('gameStarted');
@@ -92,32 +109,37 @@ io.on('connection', (socket) => {
     });
 
     function startNewRound() {
+        if (!gameActive) return;
+        let attempts = 0;
         do {
             currentPres = players[presidentialIndex];
             presidentialIndex = (presidentialIndex + 1) % players.length;
-        } while (!currentPres.alive);
+            attempts++;
+        } while (!currentPres.alive && attempts < players.length);
 
-        currentVP = null; currentVotes = {};
+        currentVP = null;
+        currentVotes = {};
         io.emit('updatePlayerList', getPlayerListWithStatus());
         io.emit('newRound', { presidentName: currentPres.name, presidentId: currentPres.id });
     }
 
     socket.on('nominateVP', (vpName) => {
         const nominee = players.find(p => p.name === vpName && p.alive);
-        if (!nominee || nominee.id === currentPres.id) return socket.emit('errorMsg', "Invalid nominee.");
-        if (nominee.name === lastPresident || nominee.name === lastVP) return socket.emit('errorMsg', "Term limited!");
+        if (!nominee) return;
         currentVP = nominee;
         io.emit('startVoting', { pres: currentPres.name, vp: nominee.name });
     });
 
     socket.on('submitVote', (vote) => {
         currentVotes[socket.id] = vote;
-        const livingPlayers = players.filter(p => p.alive);
-        if (Object.keys(currentVotes).length === livingPlayers.length) {
+        const living = players.filter(p => p.alive);
+        if (Object.keys(currentVotes).length === living.length) {
             const yes = Object.values(currentVotes).filter(v => v === 'Boiler Up!').length;
-            if (yes > (livingPlayers.length / 2)) {
+            if (yes > (living.length / 2)) {
                 electionTracker = 0;
-                if (enactedPolicies.construction >= 3 && currentVP.role === "THE BISON 🦬") return io.emit('gameOver', "HOOSIERS WIN: Bison elected VP!");
+                if (enactedPolicies.construction >= 3 && currentVP.role === "THE BISON 🦬") {
+                    return endGame("HOOSIERS WIN: The Bison was elected VP!");
+                }
                 io.to(currentPres.id).emit('presDrawPhase');
             } else {
                 electionTracker++;
@@ -140,24 +162,18 @@ io.on('connection', (socket) => {
         io.to(currentVP.id).emit('vpEnactPhase', { cards: rem, canVeto: enactedPolicies.construction >= 5 });
     });
 
-    socket.on('vpVetoRequest', () => { io.to(currentPres.id).emit('presVetoDecision'); });
-
-    socket.on('presVetoConfirm', (agreed) => {
-        if (agreed) {
-            electionTracker++;
-            if (electionTracker >= 3) { applyPolicy(deck.shift()); electionTracker = 0; }
-            else startNewRound();
-        }
-    });
-
     socket.on('vpEnact', (chosen) => { applyPolicy(chosen); });
 
     function applyPolicy(type) {
+        if (!type) { createDeck(); type = deck.shift(); }
         type === "Tradition" ? enactedPolicies.tradition++ : enactedPolicies.construction++;
         lastPresident = currentPres.name; lastVP = currentVP.name;
+        
         io.emit('policyUpdated', { enactedPolicies, electionTracker, playerCount: players.length });
-        if (enactedPolicies.tradition >= 5) return io.emit('gameOver', "BOILERMAKERS WIN!");
-        if (enactedPolicies.construction >= 6) return io.emit('gameOver', "HOOSIERS WIN!");
+        
+        if (enactedPolicies.tradition >= 5) return endGame("BOILERMAKERS WIN: Tradition preserved!");
+        if (enactedPolicies.construction >= 6) return endGame("HOOSIERS WIN: Construction completed!");
+        
         if (type === "Construction") handlePower(enactedPolicies.construction);
         else startNewRound();
     }
@@ -178,25 +194,39 @@ io.on('connection', (socket) => {
 
     socket.on('powerExpel', (name) => {
         const target = players.find(p => p.name === name);
-        target.alive = false;
-        io.emit('chatMessage', { user: "SYSTEM", msg: `${name} was EXPELLED!` });
-        if (target.role === "THE BISON 🦬") return io.emit('gameOver', "BOILERMAKERS WIN: Bison Expelled!");
+        if (target) {
+            target.alive = false;
+            io.emit('chatMessage', { user: "SYSTEM", msg: `${name} was EXPELLED!` });
+            if (target.role === "THE BISON 🦬") return endGame("BOILERMAKERS WIN: Bison Expelled!");
+        }
         startNewRound();
     });
 
-    socket.on('peekFinished', () => startNewRound());
+    function endGame(msg) {
+        io.emit('gameOver', msg);
+        resetServerState();
+    }
 
-    socket.on('disconnect', () => {
+    socket.on('sendChat', (msg) => {
         const p = players.find(p => p.id === socket.id);
-        if (p) {
-            players = players.filter(pl => pl.id !== socket.id);
+        if (p) io.emit('chatMessage', { user: p.name, msg });
+    });
+
+    // 3. ROBUST DISCONNECT LOGIC
+    socket.on('disconnect', () => {
+        const pIndex = players.findIndex(p => p.id === socket.id);
+        if (pIndex !== -1) {
+            const leaver = players[pIndex];
+            players.splice(pIndex, 1);
+            
             if (gameActive) {
-                gameActive = false;
-                io.emit('resetToLobby', `${p.name} disconnected. Returning to lobby.`);
+                resetServerState();
+                io.emit('resetToLobby', `${leaver.name} left. Game terminated.`);
             }
             io.emit('updatePlayerList', getPlayerListWithStatus());
         }
+        if (players.length === 0) resetServerState();
     });
 });
 
-server.listen(3000);
+server.listen(3000, () => console.log("Server running on port 3000"));

@@ -28,6 +28,13 @@ app.get('/', (req, res) => { res.sendFile(__dirname + '/index.html'); });
 io.on('connection', (socket) => {
     socket.on('joinGame', (name) => {
         if (gameActive) return socket.emit('errorMsg', "Game in progress.");
+        
+        // Name duplicate check
+        const nameExists = players.some(p => p.name.toLowerCase() === name.toLowerCase());
+        if (nameExists) {
+            return socket.emit('errorMsg', "That name is already taken. Pick another!");
+        }
+
         players.push({ id: socket.id, name, role: 'Unassigned', party: 'Liberal', alive: true });
         io.emit('updatePlayerList', getPlayerListWithStatus());
         io.emit('chatMessage', { user: "SYSTEM", msg: `${name} has joined the lobby.` });
@@ -52,12 +59,13 @@ io.on('connection', (socket) => {
         if (count < 5) return socket.emit('errorMsg', "Need 5+ players.");
         gameActive = true;
         createDeck();
+        enactedPolicies = { tradition: 0, construction: 0 };
+        electionTracker = 0;
         
         let shuffled = [...players].sort(() => 0.5 - Math.random());
         let bison = shuffled[0];
         bison.role = "THE BISON 🦬"; bison.party = "Fascist";
 
-        // Logic based on player count
         if (count <= 6) {
             let spy = shuffled[1];
             spy.role = "HOOSIER SPY 🚩"; spy.party = "Fascist";
@@ -67,7 +75,6 @@ io.on('connection', (socket) => {
             let spyCount = count <= 8 ? 2 : 3;
             let spies = shuffled.slice(1, 1 + spyCount);
             spies.forEach(s => { s.role = "HOOSIER SPY 🚩"; s.party = "Fascist"; });
-            
             spies.forEach(s => {
                 let otherSpies = spies.filter(other => other.id !== s.id).map(os => os.name);
                 io.to(s.id).emit('assignRole', { role: s.role, party: s.party, info: `Bison: ${bison.name}. Spies: ${otherSpies.join(', ')}` });
@@ -80,7 +87,7 @@ io.on('connection', (socket) => {
             io.to(p.id).emit('assignRole', { role: p.role, party: p.party, info: "Find the Spies!" });
         });
 
-        io.emit('gameStarted'); // This hides the lobby for everyone
+        io.emit('gameStarted');
         startNewRound();
     });
 
@@ -133,9 +140,7 @@ io.on('connection', (socket) => {
         io.to(currentVP.id).emit('vpEnactPhase', { cards: rem, canVeto: enactedPolicies.construction >= 5 });
     });
 
-    socket.on('vpVetoRequest', () => {
-        io.to(currentPres.id).emit('presVetoDecision');
-    });
+    socket.on('vpVetoRequest', () => { io.to(currentPres.id).emit('presVetoDecision'); });
 
     socket.on('presVetoConfirm', (agreed) => {
         if (agreed) {
@@ -180,7 +185,18 @@ io.on('connection', (socket) => {
     });
 
     socket.on('peekFinished', () => startNewRound());
-    socket.on('disconnect', () => { players = players.filter(p => p.id !== socket.id); io.emit('updatePlayerList', getPlayerListWithStatus()); });
+
+    socket.on('disconnect', () => {
+        const p = players.find(p => p.id === socket.id);
+        if (p) {
+            players = players.filter(pl => pl.id !== socket.id);
+            if (gameActive) {
+                gameActive = false;
+                io.emit('resetToLobby', `${p.name} disconnected. Returning to lobby.`);
+            }
+            io.emit('updatePlayerList', getPlayerListWithStatus());
+        }
+    });
 });
 
 server.listen(3000);

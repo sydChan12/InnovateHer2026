@@ -16,7 +16,6 @@ let currentPres = null, currentVP = null;
 let currentVotes = {};
 let gameActive = false;
 let presidentialIndex = 0;
-let vetoUnlocked = false;
 
 function createDeck() {
     deck = [...Array(6).fill("Tradition"), ...Array(11).fill("Construction")];
@@ -31,6 +30,7 @@ io.on('connection', (socket) => {
         if (gameActive) return socket.emit('errorMsg', "Game in progress.");
         players.push({ id: socket.id, name, role: 'Unassigned', party: 'Liberal', alive: true });
         io.emit('updatePlayerList', getPlayerListWithStatus());
+        io.emit('chatMessage', { user: "SYSTEM", msg: `${name} has joined the lobby.` });
     });
 
     socket.on('sendChat', (msg) => {
@@ -57,11 +57,10 @@ io.on('connection', (socket) => {
         let bison = shuffled[0];
         bison.role = "THE BISON 🦬"; bison.party = "Fascist";
 
-        // Logic for Spies/Bison knowledge based on player count
+        // Logic based on player count
         if (count <= 6) {
             let spy = shuffled[1];
             spy.role = "HOOSIER SPY 🚩"; spy.party = "Fascist";
-            // 5-6: Bison and Spy know each other
             io.to(bison.id).emit('assignRole', { role: bison.role, party: bison.party, info: `Spy is: ${spy.name}` });
             io.to(spy.id).emit('assignRole', { role: spy.role, party: spy.party, info: `Bison is: ${bison.name}` });
         } else {
@@ -69,7 +68,6 @@ io.on('connection', (socket) => {
             let spies = shuffled.slice(1, 1 + spyCount);
             spies.forEach(s => { s.role = "HOOSIER SPY 🚩"; s.party = "Fascist"; });
             
-            // 7-10: Spies know Bison, Bison knows nobody
             spies.forEach(s => {
                 let otherSpies = spies.filter(other => other.id !== s.id).map(os => os.name);
                 io.to(s.id).emit('assignRole', { role: s.role, party: s.party, info: `Bison: ${bison.name}. Spies: ${otherSpies.join(', ')}` });
@@ -79,21 +77,20 @@ io.on('connection', (socket) => {
 
         players.filter(p => p.role === 'Unassigned').forEach(p => {
             p.role = "BOILERMAKER 🚂"; p.party = "Liberal";
-            io.to(p.id).emit('assignRole', { role: p.role, party: p.party, info: "Work with other Boilermakers." });
+            io.to(p.id).emit('assignRole', { role: p.role, party: p.party, info: "Find the Spies!" });
         });
 
+        io.emit('gameStarted'); // This hides the lobby for everyone
         startNewRound();
     });
 
     function startNewRound() {
-        // Find next living player for President
         do {
             currentPres = players[presidentialIndex];
             presidentialIndex = (presidentialIndex + 1) % players.length;
         } while (!currentPres.alive);
 
         currentVP = null; currentVotes = {};
-        io.emit('gameStarted');
         io.emit('updatePlayerList', getPlayerListWithStatus());
         io.emit('newRound', { presidentName: currentPres.name, presidentId: currentPres.id });
     }
@@ -102,7 +99,6 @@ io.on('connection', (socket) => {
         const nominee = players.find(p => p.name === vpName && p.alive);
         if (!nominee || nominee.id === currentPres.id) return socket.emit('errorMsg', "Invalid nominee.");
         if (nominee.name === lastPresident || nominee.name === lastVP) return socket.emit('errorMsg', "Term limited!");
-        
         currentVP = nominee;
         io.emit('startVoting', { pres: currentPres.name, vp: nominee.name });
     });
@@ -114,16 +110,12 @@ io.on('connection', (socket) => {
             const yes = Object.values(currentVotes).filter(v => v === 'Boiler Up!').length;
             if (yes > (livingPlayers.length / 2)) {
                 electionTracker = 0;
-                // Bison Win Condition: Elected VP after 3rd Construction
-                if (enactedPolicies.construction >= 3 && currentVP.role === "THE BISON 🦬") {
-                    return io.emit('gameOver', "HOOSIERS WIN: The Bison was elected VP!");
-                }
+                if (enactedPolicies.construction >= 3 && currentVP.role === "THE BISON 🦬") return io.emit('gameOver', "HOOSIERS WIN: Bison elected VP!");
                 io.to(currentPres.id).emit('presDrawPhase');
             } else {
                 electionTracker++;
                 if (electionTracker >= 3) {
-                    const chaos = deck.shift();
-                    applyPolicy(chaos);
+                    applyPolicy(deck.shift());
                     electionTracker = 0;
                 } else {
                     startNewRound();
@@ -142,76 +134,53 @@ io.on('connection', (socket) => {
     });
 
     socket.on('vpVetoRequest', () => {
-        io.emit('chatMessage', { user: "SYSTEM", msg: "VP requested a VETO. Waiting for President..." });
         io.to(currentPres.id).emit('presVetoDecision');
     });
 
     socket.on('presVetoConfirm', (agreed) => {
         if (agreed) {
-            io.emit('chatMessage', { user: "SYSTEM", msg: "Veto accepted! Election Tracker increases." });
             electionTracker++;
-            if (electionTracker >= 3) {
-                const chaos = deck.shift();
-                applyPolicy(chaos);
-                electionTracker = 0;
-            } else {
-                startNewRound();
-            }
-        } else {
-            io.emit('chatMessage', { user: "SYSTEM", msg: "President denied Veto. VP must enact a card." });
+            if (electionTracker >= 3) { applyPolicy(deck.shift()); electionTracker = 0; }
+            else startNewRound();
         }
     });
 
-    socket.on('vpEnact', (chosen) => {
-        applyPolicy(chosen);
-    });
+    socket.on('vpEnact', (chosen) => { applyPolicy(chosen); });
 
     function applyPolicy(type) {
         type === "Tradition" ? enactedPolicies.tradition++ : enactedPolicies.construction++;
         lastPresident = currentPres.name; lastVP = currentVP.name;
         io.emit('policyUpdated', { enactedPolicies, electionTracker, playerCount: players.length });
-        
         if (enactedPolicies.tradition >= 5) return io.emit('gameOver', "BOILERMAKERS WIN!");
         if (enactedPolicies.construction >= 6) return io.emit('gameOver', "HOOSIERS WIN!");
-
-        // Handle Presidential Powers
-        if (type === "Construction") {
-            handlePower(enactedPolicies.construction);
-        } else {
-            startNewRound();
-        }
+        if (type === "Construction") handlePower(enactedPolicies.construction);
+        else startNewRound();
     }
 
     function handlePower(count) {
         const total = players.length;
-        if (count === 1 && total >= 9) {
-            socket.emit('triggerInvestigate');
-        } else if (count === 2 && total >= 7) {
-            socket.emit('triggerInvestigate');
-        } else if (count === 3) {
-            socket.emit('triggerPeek', deck.slice(0, 3));
-        } else if (count === 4 || count === 5) {
-            socket.emit('triggerExpel');
-        } else {
-            startNewRound();
-        }
+        if ((count === 1 && total >= 9) || (count === 2 && total >= 7)) io.to(currentPres.id).emit('triggerInvestigate');
+        else if (count === 3) io.to(currentPres.id).emit('triggerPeek', deck.slice(0, 3));
+        else if (count === 4 || count === 5) io.to(currentPres.id).emit('triggerExpel');
+        else startNewRound();
     }
 
-    socket.on('powerInvestigate', (targetName) => {
-        const target = players.find(p => p.name === targetName);
-        socket.emit('investigateResult', { name: targetName, party: target.party });
+    socket.on('powerInvestigate', (name) => {
+        const target = players.find(p => p.name === name);
+        socket.emit('investigateResult', { name, party: target.party });
         startNewRound();
     });
 
-    socket.on('powerExpel', (targetName) => {
-        const target = players.find(p => p.name === targetName);
+    socket.on('powerExpel', (name) => {
+        const target = players.find(p => p.name === name);
         target.alive = false;
-        io.emit('chatMessage', { user: "SYSTEM", msg: `${targetName} has been EXPELLED from Purdue.` });
-        if (target.role === "THE BISON 🦬") return io.emit('gameOver', "BOILERMAKERS WIN: The Bison was expelled!");
+        io.emit('chatMessage', { user: "SYSTEM", msg: `${name} was EXPELLED!` });
+        if (target.role === "THE BISON 🦬") return io.emit('gameOver', "BOILERMAKERS WIN: Bison Expelled!");
         startNewRound();
     });
 
     socket.on('peekFinished', () => startNewRound());
+    socket.on('disconnect', () => { players = players.filter(p => p.id !== socket.id); io.emit('updatePlayerList', getPlayerListWithStatus()); });
 });
 
 server.listen(3000);

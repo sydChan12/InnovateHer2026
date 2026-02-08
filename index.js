@@ -259,6 +259,7 @@ io.on('connection', (socket) => {
     socket.on('resumeAfterExpel', () => {
         const room = rooms[socket.roomCode];
         if (room && socket.id === room.currentPres.id) {
+            io.to(socket.roomCode).emit('closeOverlay');
             startNewRound(room);
         }
     });

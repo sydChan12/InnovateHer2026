@@ -113,19 +113,11 @@ io.on('connection', (socket) => {
     function startNewRound(room) {
         if (!room.gameActive) return;
         let attempts = 0;
-        let foundEligible = false;
-        while (attempts < room.players.length) {
+        do {
             room.currentPres = room.players[room.presidentialIndex];
-            if (room.currentPres.alive && !room.currentPres.expelled) {
-                foundEligible = true;
-                break;
-            }
+            room.presidentialIndex = (room.presidentialIndex + 1) % room.players.length;
             attempts++;
-        }
-        if (!foundEligible) {
-            return endGame(socket.roomCode, "No eligible presidents found. Game ended."); 
-        }
-    
+        } while (!room.currentPres.alive && attempts < room.players.length);
 
         room.currentVP = null;
         room.currentVotes = {};

@@ -54,7 +54,6 @@ io.on('connection', (socket) => {
         if (!room || room.players.length < 5) return socket.emit('errorMsg', "Need 5+ players.");
         
         room.gameActive = true;
-        // 11 Construction (IU), 6 Tradition (Purdue)
         room.deck = [...Array(6).fill("Tradition"), ...Array(11).fill("Construction")].sort(() => 0.5 - Math.random());
         room.discardPile = [];
         
@@ -87,6 +86,7 @@ io.on('connection', (socket) => {
         });
 
         io.to(socket.roomCode).emit('gameStarted');
+        broadcastCounts(socket.roomCode);
         startNewRound(room);
     });
 
@@ -94,7 +94,19 @@ io.on('connection', (socket) => {
         if (room.deck.length < needed) {
             room.deck = [...room.deck, ...room.discardPile].sort(() => 0.5 - Math.random());
             room.discardPile = [];
+            io.to(socket.roomCode).emit('reshuffleOccurred');
             io.to(socket.roomCode).emit('chatMessage', { user: "SYSTEM", msg: "Deck empty. Reshuffling discards..." });
+        }
+        broadcastCounts(socket.roomCode);
+    }
+
+    function broadcastCounts(roomCode) {
+        const room = rooms[roomCode];
+        if (room) {
+            io.to(roomCode).emit('updateCounts', {
+                deckCount: room.deck.length,
+                discardCount: room.discardPile.length
+            });
         }
     }
 
@@ -145,18 +157,22 @@ io.on('connection', (socket) => {
     socket.on('drawThree', () => {
         const room = rooms[socket.roomCode];
         shuffleIfNecessary(room, 3);
-        socket.emit('presDiscardPhase', room.deck.splice(0, 3));
+        const hand = room.deck.splice(0, 3);
+        broadcastCounts(socket.roomCode);
+        socket.emit('presDiscardPhase', hand);
     });
 
     socket.on('presDiscard', (data) => {
         const room = rooms[socket.roomCode];
         room.discardPile.push(data.discarded);
+        broadcastCounts(socket.roomCode);
         io.to(room.currentVP.id).emit('vpEnactPhase', { cards: data.kept });
     });
 
     socket.on('vpEnact', (data) => {
         const room = rooms[socket.roomCode];
         room.discardPile.push(data.discarded);
+        broadcastCounts(socket.roomCode);
         applyPolicy(socket.roomCode, data.enacted);
     });
 
@@ -167,6 +183,7 @@ io.on('connection', (socket) => {
         room.lastVP = room.currentVP ? room.currentVP.name : null;
         
         io.to(roomCode).emit('policyUpdated', { enactedPolicies: room.enactedPolicies, electionTracker: room.electionTracker, playerCount: room.players.length });
+        broadcastCounts(roomCode);
         
         if (room.enactedPolicies.tradition >= 5) return endGame(roomCode, "BOILERMAKERS WIN!");
         if (room.enactedPolicies.construction >= 6) return endGame(roomCode, "HOOSIERS WIN!");
@@ -180,7 +197,8 @@ io.on('connection', (socket) => {
         if ((count === 1 && room.players.length >= 9) || (count === 2 && room.players.length >= 7)) {
             io.to(room.currentPres.id).emit('triggerInvestigate');
         } else if (count === 3) {
-            shuffleIfNecessary(room, 3);
+            // No reshuffle here because it's just a peek, but we broadcast counts anyway
+            broadcastCounts(roomCode);
             io.to(room.currentPres.id).emit('triggerPeek', room.deck.slice(0, 3));
         } else if (count === 4 || count === 5) {
             io.to(room.currentPres.id).emit('triggerExpel');

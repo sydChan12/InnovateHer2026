@@ -140,8 +140,20 @@
             document.getElementById('lobby-players').innerHTML = data.map(p => `<div style="padding: 5px 0; border-bottom: 1px solid #222;">${p.name} ${p.isHost ? '<span style="color:var(--p-gold); font-size: 0.6rem;">[HOST]</span>' : ''}</div>`).join('');
             
             // Update the Sidebar display
-            document.getElementById('player-list').innerHTML = data.map(p => `<div style="padding:5px; margin:2px; background:#111; border-left:3px solid ${p.isPres?'var(--p-gold)':'#333'}; opacity:${p.alive?1:0.3}">${p.name} ${p.isPres?'👑':''} ${p.isLimit?'🚫':''}</div>`).join('');
-        });
+            socket.on('updatePlayerList', data => {
+    players = data;
+    document.getElementById('lobby-players').innerHTML = data.map(p => `<div style="padding: 5px 0; border-bottom: 1px solid #222;">${p.name} ${p.isHost ? '<span style="color:var(--p-gold); font-size: 0.6rem;">[HOST]</span>' : ''}</div>`).join('');
+    
+    document.getElementById('player-list').innerHTML = data.map(p => `
+        <div style="padding:5px; margin:2px; background:#111; border-left:3px solid ${p.isPres?'var(--p-gold)':'#333'}; opacity:${p.alive?1:0.4}">
+            <span style="${p.alive ? '' : 'text-decoration: line-through; color: var(--iu-red);'}">
+                ${p.alive ? '' : '✕ '}${p.name}
+            </span>
+            ${p.isPres ? ' 👑' : ''} 
+            ${p.isLimit ? ' 🚫' : ''}
+        </div>
+    `).join('');
+});
 
         socket.on('updateCounts', d => {
             document.getElementById('deck-count').innerText = d.deckCount;
@@ -207,6 +219,44 @@
             currentHand = hand;
             showPolicyChoice(true);
         });
+
+        // --- PUT THIS WITH YOUR OTHER socket.on LISTENERS ---
+
+socket.on('expelAnimation', d => {
+    const overlay = document.getElementById('overlay');
+    const content = document.getElementById('o-content');
+    
+    // Set the Title
+    document.getElementById('o-title').innerText = "STUDENT EXPELLED";
+    
+    // Find yourself in the player list to check if you are President
+    const me = players.find(p => p.name === myName);
+    const isPres = me && p.isPres; // This uses the logic from your getPlayerListWithStatus
+
+    // Update the UI content
+    content.innerHTML = `
+        <div style="text-align:center; padding: 20px;">
+            <h1 style="color:var(--iu-red); font-size: 3.5rem; margin-bottom: 10px;">${d.name}</h1>
+            <p style="font-size: 1.2rem; letter-spacing: 1px;">HAS BEEN REMOVED FROM PURDUE</p>
+            <hr style="border: 0; border-top: 1px solid #333; margin: 20px 0;">
+            ${d.isBison ? `<h2 style="color:var(--p-gold);">THE BISON HAS FALLEN!</h2>` : ''}
+            
+            <div id="expel-footer">
+                ${p.isPres ? 
+                    `<button class="btn btn-gold" onclick="resumeGame()">Continue Term</button>` : 
+                    `<p style="color:#666; font-style: italic;">Waiting for President to acknowledge...</p>`}
+            </div>
+        </div>
+    `;
+    
+    overlay.style.display = 'flex';
+});
+
+// Add this helper function anywhere in your script
+function resumeGame() {
+    document.getElementById('overlay').style.display = 'none';
+    socket.emit('resumeAfterExpel');
+}
 
         socket.on('vpEnactPhase', data => {
             currentHand = data.cards;

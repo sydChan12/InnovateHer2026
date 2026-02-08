@@ -34,20 +34,6 @@
         .filled-construction { background: transparent; border-style: solid; color: transparent; background-image: url('hoosierCard.png'); background-size: contain; background-repeat: no-repeat; background-position: center;}
         .filled-tradition { background: transparent; color: black; border-style: solid; color: transparent; background-image: url('boilermakerCard.png'); background-size: contain; background-repeat: no-repeat; background-position: center;}
         .power-tag { position: absolute; bottom: -20px; font-size: 0.5rem; color: var(--p-gold); }
-        .discarding {
-            animation: discard-animation 0.6s forwards;
-            pointer-events: none;
-        }
-        @keyframes discard-animation {
-            0% {
-                transform: translateY(0) rotate(0deg);
-                opacity: 1;
-            }
-            100% {
-                transform: translateY(100px) rotate(15deg);
-                opacity: 0;
-            }
-        }
 
         #overlay, #vote-overlay, #policy-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.95); display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 1000; }
        
@@ -414,60 +400,35 @@ socket.on('expelAnimation', d => {
         });
 
         function showPolicyChoice(isPres) {
-    const container = document.getElementById('policy-choices');
-    container.innerHTML = '';
-    
-    // Determine how many cards are in the hand
-    // currentHand is likely 3 for Pres, 2 for VP
-    currentHand.forEach((card, i) => {
-        const cardDiv = document.createElement('div');
-        
-        // Use the same base class
-        cardDiv.className = 'policy-card';
-        
-        // Apply the team-specific styling
-        if (card === 'Tradition') {
-            cardDiv.style.backgroundColor = "var(--p-gold)";
-            cardDiv.style.backgroundImage = "url('purdue_logo.png')";
-        } else {
-            cardDiv.style.backgroundColor = "var(--iu-red)";
-            cardDiv.style.backgroundImage = "url('iu_logo.png')";
+            const container = document.getElementById('p-choices');
+            document.getElementById('p-prompt').innerText = isPres ? "President: Discard 1 Card" : "VP: Enact 1 Policy";
+            container.innerHTML = ''; 
+            currentHand.forEach((card, i) => {
+                const cardDiv = document.createElement('div');
+                cardDiv.className = 'policy-card';
+                if (card === 'Tradition') {
+                    cardDiv.style.backgroundImage = 'url(./boilermakerCard.png)';
+                    cardDiv.style.backgroundColor = 'var(--p-gold)';
+                } else {
+                    cardDiv.style.backgroundImage = 'url(./hoosierCard.png)';
+                    cardDiv.style.backgroundColor = 'var(--iu-red)';
+                }
+                cardDiv.innerText = "";
+                cardDiv.onclick = () => {
+                    document.getElementById('policy-overlay').style.display = 'none';
+                    if (isPres) {
+                        const disc = currentHand.splice(i, 1)[0];
+                        socket.emit('presDiscard', { kept: currentHand, discarded: disc });
+                    } else {
+                        const en = currentHand[i];
+                        const disc = currentHand.filter((_, idx) => idx !== i)[0];
+                        socket.emit('vpEnact', { enacted: en, discarded: disc });
+                    }
+                };
+                container.appendChild(cardDiv);
+            });
+            document.getElementById('policy-overlay').style.display = 'flex';
         }
-
-        // --- THE SIZING FIX ---
-        // Force the background to fit perfectly regardless of card count
-        cardDiv.style.backgroundSize = "contain";
-        cardDiv.style.backgroundRepeat = "no-repeat";
-        cardDiv.style.backgroundPosition = "center 20%"; // Kept near top
-        
-        // Add text label at the bottom
-        const label = document.createElement('div');
-        label.innerText = card.toUpperCase();
-        label.style.marginTop = "auto"; // Pushes text to the bottom
-        label.style.paddingBottom = "10px";
-        label.style.fontSize = "0.8rem";
-        label.style.fontWeight = "bold";
-        cardDiv.appendChild(label);
-
-        cardDiv.onclick = () => {
-            if (isPres) {
-                cardDiv.classList.add('discarding');
-                setTimeout(() => {
-                    currentHand.splice(i, 1);
-                    socket.emit('presDiscard', currentHand);
-                    document.getElementById('overlay').style.display = 'none';
-                })
-                
-            } else {
-                // VP picks one to enact
-                const enacted = currentHand[i];
-                socket.emit('vpEnact', enacted);
-                document.getElementById('overlay').style.display = 'none';
-            }
-        };
-        container.appendChild(cardDiv);
-    });
-}
 
         socket.on('triggerPeek', cs => {
             document.getElementById('o-title').innerText = "Deck Peek";

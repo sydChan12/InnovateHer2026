@@ -1,4 +1,5 @@
-## ** Under The Bell Tower **
+## Under the Bell Tower
+Are you a Boilermaker?...or a BOILERFAKER!
 ## Inspiration
 Under the Bell Tower is inspired by social deduction type games like Werewolf and Mafia, which offers people the opportunity to get to know each other in a closer social context. At the beginning, we fondly remember playing these games together to connect with people we otherwise never would have interacted with, and wanted to share this positive experience of social connection with other people who may find themselves in the same situation.
 

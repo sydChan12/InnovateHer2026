@@ -234,8 +234,15 @@ io.on('connection', (socket) => {
 
     socket.on('powerInvestigate', (name) => {
         const room = rooms[socket.roomCode];
+        if (!room) return;
         const target = room.players.find(p => p.name === name);
+        if (!target) return;
         socket.emit('investigateResult', { name, party: target.party });
+        io.to(socket.roomCode).emit('chatMessage', {
+            user: "GOVERNMENT",
+            msg: `${room.currentPres.name} investigated ${target.name}'s records.`,
+            color: 'var(--p-gold)'
+        });
         startNewRound(room);
     });
 

@@ -240,25 +240,25 @@ io.on('connection', (socket) => {
     });
 
     socket.on('powerExpel', (name) => {
-        const room = rooms[socket.roomCode];
-        const target = room.players.find(p => p.name === name);
-        if (!target) return;
+    const room = rooms[socket.roomCode];
+    if (!room) return;
+    const target = room.players.find(p => p.name === name);
+    if (!target) return;
 
-        target.alive = false;
-        
-        // Tell everyone to show the "Expelled" screen
-        io.to(socket.roomCode).emit('expelAnimation', { 
-            name: target.name, 
-            isBison: target.role === "THE BISON 🦬" 
-        });
-
-        // If the Bison is dead, end the game after a short delay
-        if (target.role === "THE BISON 🦬") {
-            setTimeout(() => {
-                endGame(socket.roomCode, "BOILERMAKERS WIN: The Bison has been expelled!");
-            }, 3000);
-        }
+    target.alive = false;
+    
+    // This triggers the popup you just added to the HTML
+    io.to(socket.roomCode).emit('expelAnimation', { 
+        name: target.name, 
+        isBison: target.role === "THE BISON 🦬" 
     });
+
+    if (target.role === "THE BISON 🦬") {
+        setTimeout(() => endGame(socket.roomCode, "BOILERMAKERS WIN!"), 4000);
+    }
+    // Note: We REMOVED startNewRound(room) from here because 
+    // it now waits for the President to click "Continue Term"
+});
 
     // New listener to resume the game after the prompt
     socket.on('resumeAfterExpel', () => {

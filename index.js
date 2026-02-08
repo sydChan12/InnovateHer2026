@@ -126,18 +126,32 @@ io.on('connection', (socket) => {
         io.to(socket.roomCode).emit('newRound', { presidentName: room.currentPres.name, presidentId: room.currentPres.id });
     }
 
+    // Update the nominateVP listener
     socket.on('nominateVP', (vpName) => {
         const room = rooms[socket.roomCode];
-        room.currentVP = room.players.find(p => p.name === vpName);
-        io.to(socket.roomCode).emit('startVoting', { pres: room.currentPres.name, vp: room.currentVP.name });
+        if (!room || !room.currentPres || socket.id !== room.currentPres.id) return;
+
+        // Ensure target is alive
+        const target = room.players.find(p => p.name === vpName);
+        if (target && target.alive) {
+            room.currentVP = target;
+            io.to(socket.roomCode).emit('startVoting', { pres: room.currentPres.name, vp: room.currentVP.name });
+        }
     });
 
+    // Update the submitVote listener
     socket.on('submitVote', (vote) => {
         const room = rooms[socket.roomCode];
         if (!room) return;
+
+        const player = room.players.find(p => p.id === socket.id);
+        // BLOCK: Dead players cannot vote
+        if (!player || !player.alive) return;
+
         room.currentVotes[socket.id] = vote;
         const living = room.players.filter(p => p.alive);
 
+        // Only wait for votes from living players
         if (Object.keys(room.currentVotes).length === living.length) {
             const yes = Object.values(room.currentVotes).filter(v => v === 'Boiler Up!').length;
             
@@ -153,7 +167,7 @@ io.on('connection', (socket) => {
                     room.electionTracker = 0;
                     shuffleIfNecessary(room, 1);
                     const forced = room.deck.shift();
-                    io.to(socket.roomCode).emit('chatMessage', { user: "GOVERNMENT", msg: `Elections failed 3x! Chaos ensues. Forced policy: ${forced}` });
+                    io.to(socket.roomCode).emit('chatMessage', { user: "GOVERNMENT", msg: `Elections failed 3x! Forced policy: ${forced}` });
                     applyPolicy(socket.roomCode, forced, true);
                 } else {
                     startNewRound(room);

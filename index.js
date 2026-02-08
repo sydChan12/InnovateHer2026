@@ -113,16 +113,36 @@ io.on('connection', (socket) => {
     function startNewRound(room) {
         if (!room.gameActive) return;
         let attempts = 0;
-        do {
+        let foundEligible = false;
+        const roomCode = Object.keys(rooms).find(code => rooms[code] === room); 
+        while (attempts < room.players.length) {
             room.currentPres = room.players[room.presidentialIndex];
             room.presidentialIndex = (room.presidentialIndex + 1) % room.players.length;
+            if (room.currentPres.alive && !room.currentPres.expelled) {
+                foundEligible = true;
+                break;
+            } else {
+                console.log(`Skipping ${room.currentPres.name} (Expelled)');`);
+                if (roomCode) {
+                    io.to(roomCode).emit('chatMessage', { 
+                        user: "SYSTEM",
+                        msg: '${room.currentPres.name} is expelled and cannot be President.',
+                        color: '#888'
+                    });
+                }
+            }
             attempts++;
-        } while (!room.currentPres.alive && attempts < room.players.length);
-
+        }   
+        if (!foundEligible) {
+            return endGame(roomCode, "No eligible Presidents left. Game ended.");
+        }
+        
         room.currentVP = null;
         room.currentVotes = {};
-        io.to(socket.roomCode).emit('updatePlayerList', getPlayerListWithStatus(room));
-        io.to(socket.roomCode).emit('newRound', { presidentName: room.currentPres.name, presidentId: room.currentPres.id });
+        if (roomCode) {
+            io.to(roomCode).emit('updatePlayerList', getPlayerListWithStatus(room));
+            io.to(roomCode).emit('newRound', { presidentName: room.currentPres.name, presidentId: room.currentPres.id });
+        }
     }
 
     socket.on('nominateVP', (vpName) => {
@@ -307,6 +327,7 @@ io.on('connection', (socket) => {
         }));
     }
 });
+
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`Server on ${PORT}`));

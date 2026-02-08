@@ -48,6 +48,26 @@
     max-width: 400px;
     font-family: 'Courier New', Courier, monospace;
 }
+/* This targets the cards in the President/VP choice overlay */
+.policy-card {
+    width: 100px;
+    height: 150px;
+    display: inline-block;
+    margin: 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    
+    /* Image Resizing Logic */
+    background-size: 80%;      /* Shrinks the logo so it doesn't touch the edges */
+    background-repeat: no-repeat;
+    background-position: center 30%; /* Moves logo slightly up to leave room for text */
+    border: 3px solid white;
+    transition: transform 0.2s;
+}
+
+.policy-card:hover {
+    transform: scale(1.05);
+}
 
 /* Victory Screen Style */
 .victory-screen {

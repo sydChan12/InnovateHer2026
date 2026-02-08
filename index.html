@@ -261,34 +261,34 @@ socket.on('updatePlayerList', data => {
 });
 
 // 3. Update the Expel Animation text to match the new "Silenced" rule
-        socket.on('expelAnimation', d => {
-            const overlay = document.getElementById('overlay');
-            const content = document.getElementById('o-content');
+socket.on('expelAnimation', d => {
+    const overlay = document.getElementById('overlay');
+    const content = document.getElementById('o-content');
     document.getElementById('o-title').innerText = "CAMPUS RESTRICTION";
-            
-            const me = players.find(p => p.id === socket.id);
-            const isPres = me && me.isPres;
+    
+    const me = players.find(p => p.id === socket.id);
+    const isPres = me && me.isPres;
 
-            content.innerHTML = `
-                <div style="text-align:center; padding: 20px;">
+    content.innerHTML = `
+        <div style="text-align:center; padding: 20px;">
             <h1 style="color:var(--iu-red); font-size: 3rem;">${d.name}</h1>
             <p>HAS BEEN EXPELLED FROM THE BELL TOWER</p>
             <p style="font-size:0.8rem; color:#888;">(They can no longer speak, vote, or hold office)</p>
-                    <hr style="border: 0; border-top: 1px solid #333; margin: 20px 0;">
+            <hr style="border: 0; border-top: 1px solid #333; margin: 20px 0;">
             ${d.isBison ? `<h2 style="color:var(--p-gold);">THE BISON HAS BEEN DISCOVERED!</h2>` : ''}
-                    <div id="expel-footer">
-                        ${isPres ? 
-                            `<button class="btn btn-gold" onclick="resumeGame()">Continue Term</button>` : 
-                            `<p style="color:#666; font-style: italic;">Waiting for President to acknowledge...</p>`}
-                    </div>
-                </div>
-            `;
-            overlay.style.display = 'flex';
-        });
+            <div id="expel-footer">
+                ${isPres ? 
+                    `<button class="btn btn-gold" onclick="resumeGame()">Continue Term</button>` : 
+                    `<p style="color:#666; font-style: italic;">Waiting for President to acknowledge...</p>`}
+            </div>
+        </div>
+    `;
+    overlay.style.display = 'flex';
+});
 
-        
-
+       
         function resumeGame() {
+            document.getElementById('overlay').style.display = 'none';
             socket.emit('resumeAfterExpel');
         }
 
@@ -340,6 +340,35 @@ socket.on('updatePlayerList', data => {
             h.appendChild(msgEl); 
             h.scrollTop = h.scrollHeight; 
         });
+
+        // --- Add this to your index.html script ---
+
+socket.on('triggerInvestigate', () => {
+    const overlay = document.getElementById('overlay');
+    const content = document.getElementById('o-content');
+    document.getElementById('o-title').innerText = "INVESTIGATE STUDENT RECORD";
+
+    // President can investigate anyone except themselves
+    const targets = players.filter(p => p.name !== myName);
+
+    content.innerHTML = `
+        <div style="padding:20px; text-align:center;">
+            <p style="font-size:0.8rem; margin-bottom:15px; color:#888;">View a student's true affiliation (Boilermaker or Hoosier).</p>
+            <select id="inv-sel" style="padding:10px; width:200px; background:#000; color:white; border:1px solid var(--p-gold);">
+                ${targets.map(p => `<option value="${p.name}">${p.name}</option>`).join('')}
+            </select>
+            <br><br>
+            <button class="btn btn-gold" onclick="confirmInvestigate()">VIEW RECORD</button>
+        </div>
+    `;
+    overlay.style.display = 'flex';
+});
+
+function confirmInvestigate() {
+    const val = document.getElementById('inv-sel').value;
+    socket.emit('powerInvestigate', val);
+    document.getElementById('overlay').style.display = 'none';
+}
 
         function sendChat() { const i = document.getElementById('chat-msg'); if(i.value) { socket.emit('sendChat', i.value); i.value = ''; } }
         socket.on('errorMsg', m => alert(m));

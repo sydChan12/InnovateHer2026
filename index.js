@@ -1,5 +1,6 @@
+const path = require('path');
 const express = require('express');
-app.use(express.static(__dirname));
+app.use(express.static(path.join(__dirname, '')));
 const http = require('http');
 const { Server } = require('socket.io');
 

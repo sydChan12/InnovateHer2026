@@ -185,8 +185,17 @@
         }
 
         socket.on('startVoting', d => {
-            document.getElementById('v-prompt').innerText = `Elect ${d.pres} & ${d.vp}?`;
-            document.getElementById('vote-overlay').style.display = 'flex';
+            // Find yourself in the current local players list
+            const me = players.find(p => p.name === myName);
+            
+            // Only show the voting buttons if you are still alive
+            if (me && me.alive) {
+                document.getElementById('v-prompt').innerText = `Elect ${d.pres} & ${d.vp}?`;
+                document.getElementById('vote-overlay').style.display = 'flex';
+            } else {
+                // For dead players, just update the status so they know what's happening
+                document.getElementById('status').innerText = `Election: ${d.pres} & ${d.vp} (Watching)`;
+            }
         });
 
         function cast(v) { socket.emit('submitVote', v); document.getElementById('vote-overlay').style.display = 'none'; }

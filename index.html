@@ -18,26 +18,22 @@
 
         #game-area { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 20px; overflow-y: auto; }
         
-        /* Pile Visuals */
-        .pile-container { display: flex; gap: 30px; margin-bottom: 25px; }
+        /* Piles */
+        .pile-container { display: flex; gap: 30px; margin-bottom: 20px; }
         .card-pile {
-            width: 70px; height: 95px;
-            border: 2px solid var(--p-gold);
-            border-radius: 6px;
-            display: flex; align-items: center; justify-content: center;
-            background: #1a1a1a; position: relative;
-            transition: transform 0.2s, box-shadow 0.2s;
+            width: 70px; height: 95px; border: 2px solid var(--p-gold); border-radius: 6px;
+            display: flex; align-items: center; justify-content: center; background: #1a1a1a;
         }
-        .pile-label { font-size: 0.7rem; color: #888; margin-top: 6px; text-transform: uppercase; font-weight: bold; }
         .count-badge { font-weight: bold; font-size: 1.4rem; color: var(--p-gold); }
-        
-        /* Reshuffle Animation */
-        @keyframes shufflePulse {
-            0% { transform: scale(1); box-shadow: 0 0 0 rgba(206, 184, 136, 0); }
-            50% { transform: scale(1.1); box-shadow: 0 0 20px rgba(206, 184, 136, 0.8); border-color: white; }
-            100% { transform: scale(1); box-shadow: 0 0 0 rgba(206, 184, 136, 0); }
-        }
         .shuffling { animation: shufflePulse 0.8s ease-in-out 2; }
+        @keyframes shufflePulse {
+            50% { transform: scale(1.1); box-shadow: 0 0 20px var(--p-gold); border-color: white; }
+        }
+
+        /* Tracker */
+        .tracker-row { display: flex; align-items: center; gap: 10px; margin: 10px 0; background: #111; padding: 10px; border-radius: 10px; border: 1px solid #333; }
+        .chaos-dot { width: 18px; height: 18px; border-radius: 50%; border: 2px solid #444; background: #000; transition: all 0.3s; }
+        .chaos-dot.active { background: var(--iu-red); box-shadow: 0 0 10px var(--iu-red); border-color: #ff4d4d; }
 
         .track { display: flex; gap: 10px; margin: 15px 0; }
         .slot { width: 80px; height: 110px; border: 1px dashed #444; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 0.6rem; font-weight: bold; text-align: center; }
@@ -46,7 +42,7 @@
         .power-tag { position: absolute; bottom: -20px; font-size: 0.5rem; color: var(--p-gold); }
 
         #overlay, #vote-overlay, #policy-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.95); display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 1000; }
-        .policy-card { width: 110px; height: 160px; margin: 10px; border-radius: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-weight: bold; font-size: 1.1rem; }
+        .policy-card { width: 110px; height: 160px; margin: 10px; border-radius: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -62,7 +58,6 @@
             <h3 id="room-display"></h3>
             <div id="lobby-players" style="text-align:left; margin:15px 0; font-size:0.9rem"></div>
             <button id="host-start-btn" class="btn btn-gold" style="display:none" onclick="socket.emit('startGame')">Start Game</button>
-            <p id="wait-msg" style="font-size:0.8rem; opacity:0.6">Waiting for host...</p>
         </div>
     </div>
 
@@ -80,14 +75,13 @@
         <div id="status" style="border:1px solid var(--p-gold); padding:10px 20px; border-radius:20px; margin-bottom:20px">Join a room...</div>
         
         <div class="pile-container">
-            <div style="text-align:center">
-                <div class="card-pile" id="draw-pile-visual"><span id="deck-count" class="count-badge">0</span></div>
-                <div class="pile-label">Draw Pile</div>
-            </div>
-            <div style="text-align:center">
-                <div class="card-pile" id="discard-pile-visual" style="border-color: #444;"><span id="discard-count" class="count-badge" style="color:#888">0</span></div>
-                <div class="pile-label">Discard</div>
-            </div>
+            <div style="text-align:center"><div class="card-pile" id="draw-pile-visual"><span id="deck-count" class="count-badge">0</span></div><div style="font-size:0.6rem">DRAW</div></div>
+            <div style="text-align:center"><div class="card-pile" id="discard-pile-visual" style="border-color:#444"><span id="discard-count" class="count-badge" style="color:#666">0</span></div><div style="font-size:0.6rem">DISCARD</div></div>
+        </div>
+
+        <div class="tracker-row">
+            <span style="font-size:0.7rem; color:#888">ELECTION TRACKER:</span>
+            <div id="dot-1" class="chaos-dot"></div><div id="dot-2" class="chaos-dot"></div><div id="dot-3" class="chaos-dot"></div>
         </div>
 
         <div><h5>TRADITION (PURDUE)</h5><div class="track" id="tradition-track"></div></div>
@@ -106,56 +100,25 @@
         <button class="btn" style="background:var(--iu-red); width:150px; color:white;" onclick="cast('Hammer Down!')">HAMMER DOWN!</button>
     </div>
 
-    <div id="policy-overlay">
-        <h2 id="p-prompt"></h2>
-        <div id="p-choices" style="display:flex"></div>
-    </div>
-
+    <div id="policy-overlay"><h2 id="p-prompt"></h2><div id="p-choices" style="display:flex"></div></div>
     <div id="overlay"><h2 id="o-title"></h2><div id="o-content"></div></div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
-        let myCode = "", myName = "", amHost = false, players = [];
-        let currentHand = [];
+        let myCode = "", myName = "", amHost = false, players = [], currentHand = [];
 
-        function showCreate() {
-            myName = document.getElementById('user-name').value;
-            if(myName) socket.emit('createRoom', myName);
-        }
+        function showCreate() { myName = document.getElementById('user-name').value; if(myName) socket.emit('createRoom', myName); }
+        function showJoin() { myName = document.getElementById('user-name').value; let code = prompt("Enter 5-digit Room Code:"); if(myName && code) socket.emit('joinRoom', { roomCode: code, userName: myName }); }
 
-        function showJoin() {
-            myName = document.getElementById('user-name').value;
-            let code = prompt("Enter 5-digit Room Code:");
-            if(myName && code) socket.emit('joinRoom', { roomCode: code, userName: myName });
-        }
+        socket.on('joinedRoom', d => { myCode = d.roomCode; amHost = d.isHost; document.getElementById('start-card').style.display = 'none'; document.getElementById('lobby-card').style.display = 'block'; document.getElementById('room-display').innerText = `ROOM: ${myCode}`; if(amHost) document.getElementById('host-start-btn').style.display = 'block'; });
 
-        socket.on('joinedRoom', d => {
-            myCode = d.roomCode; amHost = d.isHost;
-            document.getElementById('start-card').style.display = 'none';
-            document.getElementById('lobby-card').style.display = 'block';
-            document.getElementById('room-display').innerText = `ROOM: ${myCode}`;
-            if(amHost) document.getElementById('host-start-btn').style.display = 'block';
-        });
+        socket.on('updatePlayerList', data => { players = data; document.getElementById('player-list').innerHTML = data.map(p => `<div style="padding:5px; margin:2px; background:#111; border-left:3px solid ${p.isPres?'var(--p-gold)':'#333'}; opacity:${p.alive?1:0.3}">${p.name} ${p.isPres?'👑':''} ${p.isLimit?'🚫':''}</div>`).join(''); });
 
-        socket.on('updatePlayerList', data => {
-            players = data;
-            document.getElementById('lobby-players').innerHTML = data.map(p => `<div>${p.name}</div>`).join('');
-            document.getElementById('player-list').innerHTML = data.map(p => `<div style="padding:5px; margin:2px; background:#111; border-left:3px solid ${p.isPres?'var(--p-gold)':'#333'}; opacity:${p.alive?1:0.3}">${p.name} ${p.isPres?'👑':''} ${p.isLimit?'🚫':''}</div>`).join('');
-        });
+        socket.on('updateCounts', d => { document.getElementById('deck-count').innerText = d.deckCount; document.getElementById('discard-count').innerText = d.discardCount; });
 
-        socket.on('updateCounts', d => {
-            document.getElementById('deck-count').innerText = d.deckCount;
-            document.getElementById('discard-count').innerText = d.discardCount;
-        });
+        socket.on('reshuffleOccurred', () => { const d = document.getElementById('draw-pile-visual'); d.classList.add('shuffling'); setTimeout(() => d.classList.remove('shuffling'), 1600); });
 
-        socket.on('reshuffleOccurred', () => {
-            const draw = document.getElementById('draw-pile-visual');
-            draw.classList.add('shuffling');
-            setTimeout(() => draw.classList.remove('shuffling'), 1600);
-        });
-
-        socket.on('gameStarted', () => document.getElementById('setup-screen').style.display = 'none');
         socket.on('assignRole', d => { window.roleData = d; });
         function reveal(s) { document.getElementById('id-text').innerText = s ? `${window.roleData.role}\n${window.roleData.info}` : "Identity: [Hidden]"; }
 
@@ -167,72 +130,44 @@
             }
             const tt = document.getElementById('tradition-track'); tt.innerHTML = '';
             for(let i=1; i<=5; i++) tt.innerHTML += `<div class="slot ${i<=d.enactedPolicies.tradition?'filled-tradition':''}">${i<=d.enactedPolicies.tradition?'PURDUE':i}</div>`;
+            for(let i=1; i<=3; i++) { const dot = document.getElementById(`dot-${i}`); i <= d.electionTracker ? dot.classList.add('active') : dot.classList.remove('active'); }
         });
 
-        socket.on('newRound', d => {
-            document.getElementById('status').innerText = `Presidential Turn: ${d.presidentName}`;
-            if(socket.id === d.presidentId){
-                document.getElementById('nom-zone').style.display = 'block';
-                document.getElementById('vp-sel').innerHTML = players.filter(p => p.name !== d.presidentName && p.alive && !p.isLimit).map(p => `<option value="${p.name}">${p.name}</option>`).join('');
-            } else document.getElementById('nom-zone').style.display = 'none';
-        });
+        socket.on('newRound', d => { document.getElementById('status').innerText = `Presidential Turn: ${d.presidentName}`; if(socket.id === d.presidentId){ document.getElementById('nom-zone').style.display = 'block'; document.getElementById('vp-sel').innerHTML = players.filter(p => p.name !== d.presidentName && p.alive && !p.isLimit).map(p => `<option value="${p.name}">${p.name}</option>`).join(''); } else document.getElementById('nom-zone').style.display = 'none'; });
 
-        socket.on('startVoting', d => {
-            document.getElementById('v-prompt').innerText = `Elect ${d.pres} & ${d.vp}?`;
-            document.getElementById('vote-overlay').style.display = 'flex';
-        });
+        socket.on('startVoting', d => { document.getElementById('v-prompt').innerText = `Elect ${d.pres} & ${d.vp}?`; document.getElementById('vote-overlay').style.display = 'flex'; });
 
         function cast(v) { socket.emit('submitVote', v); document.getElementById('vote-overlay').style.display = 'none'; }
         
         socket.on('presDrawPhase', () => document.getElementById('draw-btn').style.display = 'block');
         
-        socket.on('presDiscardPhase', hand => {
-            document.getElementById('draw-btn').style.display = 'none';
-            currentHand = hand;
-            showPolicyChoice(true);
-        });
+        socket.on('presDiscardPhase', hand => { document.getElementById('draw-btn').style.display = 'none'; currentHand = hand; showPolicyChoice(true); });
 
-        socket.on('vpEnactPhase', data => {
-            currentHand = data.cards;
-            showPolicyChoice(false);
-        });
+        socket.on('vpEnactPhase', data => { currentHand = data.cards; showPolicyChoice(false); });
 
         function showPolicyChoice(isPres) {
             const container = document.getElementById('p-choices');
             document.getElementById('p-prompt').innerText = isPres ? "President: Discard 1 Card" : "VP: Enact 1 Policy";
             container.innerHTML = ''; 
-
             currentHand.forEach((card, i) => {
                 const cardDiv = document.createElement('div');
                 cardDiv.className = 'policy-card';
                 cardDiv.style.background = (card === 'Tradition') ? 'var(--p-gold)' : 'var(--iu-red)';
                 cardDiv.innerText = card;
-                cardDiv.onclick = () => handlePolicyClick(isPres, i);
+                cardDiv.onclick = () => {
+                    document.getElementById('policy-overlay').style.display = 'none';
+                    if (isPres) {
+                        const disc = currentHand.splice(i, 1)[0];
+                        socket.emit('presDiscard', { kept: currentHand, discarded: disc });
+                    } else {
+                        const en = currentHand[i];
+                        const disc = currentHand.filter((_, idx) => idx !== i)[0];
+                        socket.emit('vpEnact', { enacted: en, discarded: disc });
+                    }
+                };
                 container.appendChild(cardDiv);
             });
             document.getElementById('policy-overlay').style.display = 'flex';
-        }
-
-        function handlePolicyClick(isPres, idx) {
-            document.getElementById('policy-overlay').style.display = 'none';
-            if (isPres) {
-                const discarded = currentHand.splice(idx, 1)[0];
-                socket.emit('presDiscard', { kept: currentHand, discarded: discarded });
-            } else {
-                const enacted = currentHand[idx];
-                const discarded = currentHand.filter((_, i) => i !== idx)[0];
-                socket.emit('vpEnact', { enacted, discarded });
-            }
-            currentHand = [];
-        }
-
-        socket.on('triggerInvestigate', () => pwr("Investigate", "powerInvestigate"));
-        socket.on('triggerExpel', () => pwr("Expel", "powerExpel"));
-        function pwr(t, e) {
-            document.getElementById('o-title').innerText = t;
-            let ops = players.filter(p => p.alive && socket.id !== p.id).map(p => `<option value="${p.name}">${p.name}</option>`).join('');
-            document.getElementById('o-content').innerHTML = `<select id="o-sel">${ops}</select><button class="btn btn-gold" onclick="socket.emit('${e}', document.getElementById('o-sel').value); document.getElementById('overlay').style.display='none'">Confirm</button>`;
-            document.getElementById('overlay').style.display = 'flex';
         }
 
         socket.on('triggerPeek', cs => {
@@ -241,11 +176,10 @@
             document.getElementById('overlay').style.display = 'flex';
         });
 
+        socket.on('gameStarted', () => document.getElementById('setup-screen').style.display = 'none');
         socket.on('investigateResult', d => alert(`${d.name}'s Party: ${d.party === 'Fascist' ? 'Fascist (Hoosier)' : 'Liberal (Boilermaker)'}`));
         socket.on('gameOver', m => { alert(m); location.reload(); });
-        socket.on('chatMessage', d => {
-            const h = document.getElementById('chat-history'); h.innerHTML += `<div><b>${d.user}:</b> ${d.msg}</div>`; h.scrollTop = h.scrollHeight;
-        });
+        socket.on('chatMessage', d => { const h = document.getElementById('chat-history'); h.innerHTML += `<div><b>${d.user}:</b> ${d.msg}</div>`; h.scrollTop = h.scrollHeight; });
         function sendChat() { const i = document.getElementById('chat-msg'); if(i.value) { socket.emit('sendChat', i.value); i.value = ''; } }
         socket.on('errorMsg', m => alert(m));
     </script>

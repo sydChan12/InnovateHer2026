@@ -133,10 +133,13 @@ io.on('connection', (socket) => {
 
     socket.on('submitVote', (vote) => {
         const room = rooms[socket.roomCode];
+        if (!room) return;
         room.currentVotes[socket.id] = vote;
         const living = room.players.filter(p => p.alive);
+
         if (Object.keys(room.currentVotes).length === living.length) {
             const yes = Object.values(room.currentVotes).filter(v => v === 'Boiler Up!').length;
+            
             if (yes > (living.length / 2)) {
                 room.electionTracker = 0;
                 if (room.enactedPolicies.construction >= 3 && room.currentVP.role === "THE BISON 🦬") {
@@ -148,9 +151,14 @@ io.on('connection', (socket) => {
                 if (room.electionTracker >= 3) {
                     room.electionTracker = 0;
                     shuffleIfNecessary(room, 1);
-                    applyPolicy(socket.roomCode, room.deck.shift());
-                } else startNewRound(room);
+                    const forced = room.deck.shift();
+                    io.to(socket.roomCode).emit('chatMessage', { user: "GOVERNMENT", msg: `Elections failed 3x! Chaos ensues. Forced policy: ${forced}` });
+                    applyPolicy(socket.roomCode, forced, true);
+                } else {
+                    startNewRound(room);
+                }
             }
+            io.to(socket.roomCode).emit('policyUpdated', { enactedPolicies: room.enactedPolicies, electionTracker: room.electionTracker, playerCount: room.players.length });
         }
     });
 
@@ -176,11 +184,16 @@ io.on('connection', (socket) => {
         applyPolicy(socket.roomCode, data.enacted);
     });
 
-    function applyPolicy(roomCode, type) {
+    function applyPolicy(roomCode, type, isForced = false) {
         const room = rooms[roomCode];
         type === "Tradition" ? room.enactedPolicies.tradition++ : room.enactedPolicies.construction++;
-        room.lastPresident = room.currentPres.name; 
-        room.lastVP = room.currentVP ? room.currentVP.name : null;
+        
+        if (!isForced) {
+            room.lastPresident = room.currentPres.name; 
+            room.lastVP = room.currentVP ? room.currentVP.name : null;
+        } else {
+            room.lastPresident = null; room.lastVP = null;
+        }
         
         io.to(roomCode).emit('policyUpdated', { enactedPolicies: room.enactedPolicies, electionTracker: room.electionTracker, playerCount: room.players.length });
         broadcastCounts(roomCode);
@@ -188,7 +201,7 @@ io.on('connection', (socket) => {
         if (room.enactedPolicies.tradition >= 5) return endGame(roomCode, "BOILERMAKERS WIN!");
         if (room.enactedPolicies.construction >= 6) return endGame(roomCode, "HOOSIERS WIN!");
         
-        if (type === "Construction") handlePower(roomCode, room.enactedPolicies.construction);
+        if (type === "Construction" && !isForced) handlePower(roomCode, room.enactedPolicies.construction);
         else startNewRound(room);
     }
 
@@ -197,7 +210,6 @@ io.on('connection', (socket) => {
         if ((count === 1 && room.players.length >= 9) || (count === 2 && room.players.length >= 7)) {
             io.to(room.currentPres.id).emit('triggerInvestigate');
         } else if (count === 3) {
-            // No reshuffle here because it's just a peek, but we broadcast counts anyway
             broadcastCounts(roomCode);
             io.to(room.currentPres.id).emit('triggerPeek', room.deck.slice(0, 3));
         } else if (count === 4 || count === 5) {
